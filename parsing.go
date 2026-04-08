@@ -2,19 +2,19 @@ package main
 
 import (
 	"bufio"
-   "fmt"
-   "io"
-   "os"
-   "unicode/utf8"
-   "unicode"
-   // "path/filepath"
-   // "context"
+	"fmt"
+	"io"
+	"os"
+	"unicode"
+	"unicode/utf8"
+	// "path/filepath"
+	// "context"
 )
 
 func check(e error) {
-    if e != nil {
-        panic(e)
-    }
+	if e != nil {
+		panic(e)
+	}
 }
 
 type IndexedRune struct {
@@ -24,10 +24,9 @@ type IndexedRune struct {
 
 type IndexedRuneSource func() (int, rune, bool)
 
-
 func enumerate_file(path string) IndexedRuneSource {
 	file, err := os.Open(path)
-   check(err)
+	check(err)
 
 	var i int = -1
 	reader := bufio.NewReader(file)
@@ -44,11 +43,12 @@ func enumerate_file(path string) IndexedRuneSource {
 	}
 }
 
-
 func enumerate_string(str string) IndexedRuneSource {
 	var i int
 	return func() (int, rune, bool) {
-		if i >= len(str) { return i, 0, true }
+		if i >= len(str) {
+			return i, 0, true
+		}
 		r, size := utf8.DecodeRuneInString(str[i:])
 		idx := i
 		i += size
@@ -59,28 +59,34 @@ func enumerate_string(str string) IndexedRuneSource {
 func enumerate_runes(rns []rune) IndexedRuneSource {
 	var i int
 	return func() (int, rune, bool) {
-		if i >= len(rns) { return i, 0, true }
+		if i >= len(rns) {
+			return i, 0, true
+		}
 		idx := i
 		i++
 		return idx, rns[idx], false
 	}
 }
 
-
 func is_iden_start(r rune) bool {
-   if 'a' <= r && r <= 'z' { return true }
-   return 'A' <= r && r <= 'Z'
+	if 'a' <= r && r <= 'z' {
+		return true
+	}
+	return 'A' <= r && r <= 'Z'
 }
 
 func is_iden_char(r rune) bool {
-   if 'a' <= r && r <= 'z' { return true }
-   if 'A' <= r && r <= 'Z' { return true }
-   if '0' <= r && r <= '9' { return true }
-   return r == '_'
+	if 'a' <= r && r <= 'z' {
+		return true
+	}
+	if 'A' <= r && r <= 'Z' {
+		return true
+	}
+	if '0' <= r && r <= '9' {
+		return true
+	}
+	return r == '_'
 }
-
-
-
 
 func trim_buffer(buf []rune, left, right bool) []rune {
 	start := 0
@@ -101,141 +107,140 @@ func trim_buffer(buf []rune, left, right bool) []rune {
 	return buf[start:end]
 }
 
-
-
-
-
-
-
 type Segment struct {
-	typ rune
+	typ    rune
 	offset int
-	buf []rune
+	buf    []rune
 }
 
 func get_segments(read IndexedRuneSource) []Segment {
-   m := 0
-   escape := false
-   comment := false
-   buf := make([]rune, 0)
-   typ := 'R'
-   var quote rune = 0
-   strip := true
-   segments := make([]Segment, 0)
+	m := 0
+	escape := false
+	comment := false
+	buf := make([]rune, 0)
+	typ := 'R'
+	var quote rune = 0
+	strip := true
+	segments := make([]Segment, 0)
 
-   expr := func(final bool) Segment {
-      e := buf
-      if final {
-      	e = trim_buffer(e, false, true)
-      }
-      buf = make([]rune, 0)
-      if len(e) > 0 {
-         return Segment{typ, m, e}
-      } else {
-      	return Segment{}
-      }
-   }
+	expr := func(final bool) Segment {
+		e := buf
+		if final {
+			e = trim_buffer(e, false, true)
+		}
+		buf = make([]rune, 0)
+		if len(e) > 0 {
+			return Segment{typ, m, e}
+		} else {
+			return Segment{}
+		}
+	}
 
-  	segments = append(segments, Segment{'L', 0, nil})
+	segments = append(segments, Segment{'L', 0, nil})
 
-   for {
-   	i, r, eof := read()
- 
-      if r == '\n' {
-         segments = append(segments, Segment{'L', i+1, nil})
-      }
+	for {
+		i, r, eof := read()
 
-      if escape {
-         escape = false
-         buf = append(buf, r)
-         continue
-      }
+		if r == '\n' {
+			segments = append(segments, Segment{'L', i + 1, nil})
+		}
 
-      if strip {
-      	switch r {
-      		case ' ', '\t':
-      			continue
-      	}
-         strip = false
-      }
+		if escape {
+			escape = false
+			buf = append(buf, r)
+			continue
+		}
 
-      if comment {
-         if r == '\n' || eof {
-            e := expr(false)
-            strip = true
-            if e.typ != 0 { segments = append(segments, e) }
-         } else {
-            buf = append(buf, r)
-         }
-         continue
-      }
+		if strip {
+			switch r {
+			case ' ', '\t':
+				continue
+			}
+			strip = false
+		}
 
-      if quote != 0 && r == '#' {
-         e := expr(true)
-         if e.typ != 0 {
-            segments = append(segments, e)
-            segments = append(segments, Segment{';', i, nil})
-         }
-         strip = true
-         comment = true
-         typ = 'C'
-         m = i + 1
-         continue
-      }
+		if comment {
+			if r == '\n' || eof {
+				e := expr(false)
+				strip = true
+				if e.typ != 0 {
+					segments = append(segments, e)
+				}
+			} else {
+				buf = append(buf, r)
+			}
+			continue
+		}
 
-      if r == '"' || r == '\'' {
-         if quote == 0 {
-            e := expr(false)
-            if e.typ != 0 { segments = append(segments, e) }
-            m = i + 1
-            if r == '"' {
-            	typ = 'D'
-            } else {
-            	typ = 'S'
-            }
-            quote = r
-         } else {
-            if quote == r {
-               e := expr(false)
-	            if e.typ != 0 { segments = append(segments, e) }
-               typ = 'R'
-               quote = 0
-               m = i + 1
-            } else {
-               buf = append(buf, r)
-            }
-         }
-         continue
-      }
+		if quote == 0 && r == '#' {
+			e := expr(true)
+			if e.typ != 0 {
+				segments = append(segments, e)
+				segments = append(segments, Segment{';', i, nil})
+			}
+			strip = true
+			comment = true
+			typ = 'C'
+			m = i + 1
+			continue
+		}
 
-      if r == '\n' || r == ';' || eof {
-         e := expr(true)
-         if e.typ != 0 {
-         	segments = append(segments, e)
-         }
-         segments = append(segments, Segment{';', i, nil})
-         strip = true
-      } else {
-      	if r == '\\' && !escape {
-         	escape = true
-         } else {
-         	buf = append(buf, r)
-         }
-      }
+		if r == '"' || r == '\'' {
+			if quote == 0 {
+				e := expr(false)
+				if e.typ != 0 {
+					segments = append(segments, e)
+				}
+				m = i + 1
+				if r == '"' {
+					typ = 'D'
+				} else {
+					typ = 'S'
+				}
+				quote = r
+			} else {
+				if quote == r {
+					e := expr(false)
+					if e.typ != 0 {
+						segments = append(segments, e)
+					}
+					typ = 'R'
+					quote = 0
+					m = i + 1
+				} else {
+					buf = append(buf, r)
+				}
+			}
+			continue
+		}
 
-      if eof { break }
-   }
+		if r == '\n' || r == ';' || eof {
+			e := expr(true)
+			if e.typ != 0 {
+				segments = append(segments, e)
+			}
+			segments = append(segments, Segment{';', i, nil})
+			strip = true
+		} else {
+			if r == '\\' && !escape {
+				escape = true
+			} else {
+				buf = append(buf, r)
+			}
+		}
 
-   if quote != 0 {
-      // segments = append(segments, Segment{'E', -1, nil})
-      panic("unclosed quote")
-   }
+		if eof {
+			break
+		}
+	}
 
-   return segments
+	if quote != 0 {
+		// segments = append(segments, Segment{'E', -1, nil})
+		panic("unclosed quote")
+	}
+
+	return segments
 }
-
-
-
 
 
 
@@ -245,15 +250,15 @@ func get_segments(read IndexedRuneSource) []Segment {
 
 
 type ParseContext0 struct {
-	root *Token
-	curr *Token
+	root  *Token
+	curr  *Token
 	stack []*Token
 
-	text []rune
-	m int
+	text   []rune
+	m      int
 	escape bool
-	state int
-	quote rune
+	state  int
+	quote  rune
 }
 
 func (self *ParseContext0) init() {
@@ -279,7 +284,7 @@ func (self *ParseContext0) append_token(tok *Token) {
 }
 
 func (self *ParseContext0) append_text(i int) {
-	if i - self.m > 0 {
+	if i-self.m > 0 {
 		self.append_runes('T', self.text[self.m:i])
 	}
 }
@@ -306,22 +311,28 @@ func (self *ParseContext0) push(tok *Token) {
 
 func (self *ParseContext0) pop() {
 	self.curr = self.stack[len(self.stack)-1]
-	self.stack = self.stack[0:len(self.stack)-1]
+	self.stack = self.stack[0 : len(self.stack)-1]
 }
 
 
 
 
 
+
+
+
+
+
+
 func subcmd_by_text(ctx *ParseContext0) *Token {
-   read := enumerate_runes(ctx.text)
-   for {
-   	i, r, eof := read()
+	read := enumerate_runes(ctx.text)
+	for {
+		i, r, eof := read()
 
 		if r == '\\' {
 			ctx.escape = true
 			continue
-      }
+		}
 
 		if ctx.escape {
 			ctx.escape = false
@@ -347,101 +358,154 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 
 		if ctx.state == 1 {
 			if is_iden_start(r) {
-				ctx.append_text(i-1)
-            ctx.m = i
-            ctx.state = 2
+				ctx.append_text(i - 1)
+				ctx.m = i
+				ctx.state = 2
 			} else if r == '(' {
-            ctx.append_text(i-1)
-            ctx.start_subcmd()
-            ctx.m = i + 1
-            ctx.state = 0
-         } else {
-            ctx.state = 0
-         }
-      } else if ctx.state == 2 {
-         if !is_iden_char(r) {
-            if r == '[' {
-               // ctx.push_access(i)
-               ctx.m = i + 1
-            } else {
-               ctx.append_runes('V', ctx.text[ctx.m:i])
-               ctx.m = i
-            }
-            if r == '$' {
-            	ctx.state = 1
-            } else {
-            	ctx.state = 0
-            }
+				ctx.append_text(i - 1)
+				ctx.start_subcmd()
+				ctx.m = i + 1
+				ctx.state = 0
+			} else {
+				ctx.state = 0
+			}
+		} else if ctx.state == 2 {
+			if !is_iden_char(r) {
+				if r == '[' {
+					// ctx.push_access(i)
+					ctx.m = i + 1
+				} else {
+					ctx.append_runes('V', ctx.text[ctx.m:i])
+					ctx.m = i
+				}
+				if r == '$' {
+					ctx.state = 1
+				} else {
+					ctx.state = 0
+				}
 			}
 		}
 
-      if ctx.state == 0 && len(ctx.stack) > 0 {
-         closed := false
-         if ctx.curr.typ == 'S' && r == ')' {
-            closed = true
-         } else
-         if ctx.curr.typ == 'A' && r == ']' {
-            closed = true
-         }
-         if closed {
-            ctx.append_text(i)
-            if len(ctx.curr.toks) == 0 {
-               ctx.append_runes('_', nil)
-            }
-            ctx.pop()
-            ctx.m = i + 1
-         }
+		if ctx.state == 0 && len(ctx.stack) > 0 {
+			closed := false
+			if ctx.curr.typ == 'S' && r == ')' {
+				closed = true
+			} else if ctx.curr.typ == 'A' && r == ']' {
+				closed = true
+			}
+			if closed {
+				ctx.append_text(i)
+				if len(ctx.curr.toks) == 0 {
+					ctx.append_runes('_', nil)
+				}
+				ctx.pop()
+				ctx.m = i + 1
+			}
 		}
 
-      if eof {
+		if eof {
 			ctx.append_text(i)
-      	break
-      }
+			break
+		}
 	}
 
 	return ctx.root
 }
 
-
-
 func get_metaexpressions(segments []Segment) [][]Segment {
 	res := make([][]Segment, 0)
 	acc := make([]Segment, 0)
-	
+
 	for _, seg := range segments {
-   	switch seg.typ {
-      case ';':
-         if len(acc) > 0 {
-         	res = append(res, acc)
-         	acc = make([]Segment, 0)
-         }
-      case 'R', 'S', 'D':
-         acc = append(acc, seg)
-      }
+		switch seg.typ {
+		case ';':
+			if len(acc) > 0 {
+				res = append(res, acc)
+				acc = make([]Segment, 0)
+			}
+		case 'R', 'S', 'D':
+			acc = append(acc, seg)
+		}
 	}
 	return res
 }
 
-
-
 func subcmd_by_segment(segments []Segment) *Token {
-   ctx := &ParseContext0{}
-   ctx.init()
-   for _, seg := range segments {
-      if seg.typ == 'S' || seg.typ == 'D' {
-         subctx := &ParseContext0{}
-         subctx.init()
-         subctx.new_segment(seg.buf)
-         s := subcmd_by_text(subctx)
-         s.typ = 'Q'
-         ctx.append_token(s)
-      } else {
-         ctx.new_segment(seg.buf)
-         subcmd_by_text(ctx)
-      }
-   }
-   return ctx.root
+	ctx := &ParseContext0{}
+	ctx.init()
+	for _, seg := range segments {
+		if seg.typ == 'S' || seg.typ == 'D' {
+			subctx := &ParseContext0{}
+			subctx.init()
+			subctx.new_segment(seg.buf)
+			s := subcmd_by_text(subctx)
+			s.typ = 'Q'
+			ctx.append_token(s)
+		} else {
+			ctx.new_segment(seg.buf)
+			subcmd_by_text(ctx)
+		}
+	}
+	return ctx.root
 }
+
+
+
+
+
+
+
+
+
+func build_ast(metas [][]Segment) []*Token {
+	cmds := make([]*Token, 0, len(metas))
+	for _, meta := range metas {
+		cmds = append(cmds, subcmd_by_segment(meta))
+	}
+
+	root := &Token{typ: 'B', toks: make([]*Token, 0)}
+	curr := root
+	stack := make([]*Token, 0)
+
+	for _, cmd := range cmds {
+		if is_end_cmd(cmd) {
+			if len(stack) == 0 {
+				panic("unexpected end")
+			}
+			curr = stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			continue
+		}
+
+		if is_if_cmd(cmd) {
+			cond, body := parse_if(cmd)
+			if cond.typ == 0 {
+				cond.typ = 'S'
+			}
+			if body != nil {
+				if_tok := &Token{typ: 'I', toks: []*Token{cond, body}}
+				curr.toks = append(curr.toks, if_tok)
+			} else {
+				block := &Token{typ: 'B', toks: make([]*Token, 0)}
+				if_tok := &Token{typ: 'I', toks: []*Token{cond, block}}
+				curr.toks = append(curr.toks, if_tok)
+				stack = append(stack, curr)
+				curr = block
+			}
+			continue
+		}
+
+		curr.toks = append(curr.toks, cmd)
+	}
+
+	if len(stack) > 0 {
+		panic("unclosed if")
+	}
+
+	return root.toks
+}
+
+
 
 
 
@@ -452,27 +516,50 @@ func subcmd_by_segment(segments []Segment) *Token {
 
 type Function struct {
 	code []Instruction
-	stack []*Instruction
+}
+
+type CompileFrame struct {
+	f *Function
+	s []*Instruction
 }
 
 type Compiler struct {
 	funcs map[string]*Function
-	f *Function
-	code []Instruction
+
+	f     *Function
+	stack []*Instruction
+
+	frames []CompileFrame
 }
 
-func (self *Compiler) init() {
+func New_Compiler() *Compiler {
+	self := &Compiler{}
 	self.funcs = make(map[string]*Function)
 	self.f = &Function{}
+	self.f.code = make([]Instruction, 0)
 	self.funcs["main"] = self.f
+	return self
+}
+
+func (self *Compiler) push(ins Instruction) {
+	self.f.code = append(self.f.code, ins)
 }
 
 func (self *Compiler) process(tok *Token) {
-	switch tok.typ {
-		case 'B':
-			self.replace(tok, 0, true)
-		case 'S':
-			self.replace(tok, 0, true)
+	kw := false
+	/*
+		if tok.typ == 'B' && len(tok.toks) > 0 {
+			if tok.toks[0].typ == 'T' && len(tok.toks[0].buf) > 0 {
+				if is_if(tok.toks[0]) {
+					kw = true
+					cond, body := parse_if(tok)
+
+				}
+			}
+		}
+	*/
+	if !kw {
+		self.replace(tok, 0, true)
 	}
 }
 
@@ -480,36 +567,19 @@ func (self *Compiler) replace(tok *Token, reserved int, add bool) {
 	for i := 0; i < len(tok.toks); i++ {
 		t := tok.toks[i]
 		switch t.typ {
-			case 'S':
-				t.buf = []rune(fmt.Sprintf("-> %d", reserved))
-				replacement := &Token{typ:'R'}
-				replacement.buf = []rune{rune(reserved)}
-				self.replace(t, reserved, true)
-				reserved++
-				tok.toks[i] = replacement
-			case 'Q':
-				self.replace(t, reserved, false)
-				reserved++
-		}			
+		case 'S':
+			t.buf = []rune{rune(reserved)}
+			replacement := &Token{typ: 'R'}
+			replacement.buf = []rune{rune(reserved)}
+			self.replace(t, reserved, true)
+			reserved++
+			tok.toks[i] = replacement
+		case 'Q':
+			self.replace(t, reserved, false)
+			reserved++
+		}
 	}
 	if add {
-		// self.toks = append(self.toks, tok)
-		self.code = append(self.code, InstrTest{str:tok.repr()})
+		self.f.code = append(self.f.code, InstrTest{str: tok.repr()})
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

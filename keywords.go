@@ -1,69 +1,5 @@
 package main
 
-const (
-	CMD rune = iota + 128
-	IF
-)
-
-type Operation func(*Metatoken)
-
-type Node struct {
-	typ string
-	op Operation
-	tok *Metatoken
-}
-
-func (n *Node) dump() {
-	n.dump_node([]bool{}, false)
-}
-
-func (n *Node) dump_node(prefix []bool, isLast bool) {
-    for i, hasNext := range prefix {
-        if i == len(prefix)-1 {
-            if isLast {
-                fmt.Print("└── ")
-            } else {
-                fmt.Print("├── ")
-            }
-        } else {
-            if hasNext {
-                fmt.Print("│   ")
-            } else {
-                fmt.Print("    ")
-            }
-        }
-    }
-
-	fmt.Printf(" '%s'", n.typ)
-	fmt.Println()
-
-    newPrefix := make([]bool, len(prefix)+1)
-    copy(newPrefix, prefix)
-    newPrefix[len(prefix)] = !isLast
-    for i, child := range n.toks {
-        last := i == len(n.toks)-1
-        child.dump_node(newPrefix, last)
-    }
-}
-
-
-
-
-
-
-
-
-
-func do_subcommand(tok *Metatoken) {
-	
-}
-
-func do_if(tok *Metatoken) {
-	
-}
-
-
-
 func compare_runes(a, b []rune) bool {
 	for i := 0; i < len(a) && i < len(b); i++ {
 		if a[i] != b[i] {
@@ -85,136 +21,141 @@ func lstrip(s []rune) []rune {
 
 func rstrip(s []rune) []rune {
 	i := len(s) - 1
-	for i > 0 && is_space(s[i]) { i-- }
+	for i > 0 && is_space(s[i]) {
+		i--
+	}
 	out := make([]rune, i)
-	copy(out, s[:i])
+	copy(out, s[:i+1])
 	return out
 }
 
 func is_space(r rune) bool {
-    return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
-func strip_prefix(tok *Metatoken, i int) {
-   tok.buf = lstrip(tok.buf[i:])
+func trim_spaces(s []rune) []rune {
+	start := 0
+	end := len(s)
+	for start < end && is_space(s[start]) {
+		start++
+	}
+	for end > start && is_space(s[end-1]) {
+		end--
+	}
+	return s[start:end]
+}
+
+func equal_runes_str(s []rune, word string) bool {
+	if len(s) != len(word) {
+		return false
+	}
+	for i, r := range word {
+		if s[i] != r {
+			return false
+		}
+	}
+	return true
+}
+
+func strip_prefix(tok *Token, i int) {
+	tok.buf = lstrip(tok.buf[i:])
 }
 
 func find(s []rune, target rune) int {
-   for i, r := range s {
-		if r == target { return i }
+	for i, r := range s {
+		if r == target {
+			return i
+		}
 	}
 	return -1
 }
 
-func find_colon(toks []*Metatoken) (int, int) {
+func find_colon(toks []*Token) (int, int) {
 	for i := 0; i < len(toks); i++ {
 		t := toks[i]
-      if t.typ != 'T' { continue }
-      pos := find(t.buf, ':')
-      if pos != -1 { return i, pos }
-   }
-   return -1, 0
+		if t.typ != 'T' {
+			continue
+		}
+		pos := find(t.buf, ':')
+		if pos != -1 {
+			return i, pos
+		}
+	}
+	return -1, 0
 }
 
-func split_by_colon(tokens []*Metatoken) ([]*Metatoken, []*Metatoken) {
-   index, pos := find_colon(tokens)
+func split_by_colon(tokens []*Token) ([]*Token, []*Token) {
+	index, pos := find_colon(tokens)
 
-   if index == -1 {
-   	return tokens, nil
+	if index == -1 {
+		return tokens, nil
 	}
 
-   text := tokens[index].buf
-    
-   var cond []*Metatoken
-   left := rstrip(text[:pos])
-   if len(left) > 0 {
-   	cond = make([]*Metatoken, index + 1)
-   	cond[index-1] = &Metatoken{typ:'T', buf:left}
-   } else {
-   	cond = make([]*Metatoken, index)
-   }
-   copy(cond, tokens[:index])
+	text := tokens[index].buf
 
-   var body []*Metatoken
-   right := lstrip(text[pos+1:])
-   if len(right) > 0 {
-   	body = make([]*Metatoken, len(tokens) - index)
-   	body[0] = &Metatoken{typ:'T', buf:right}
-   } else {
-   	body = make([]*Metatoken, len(tokens) - index - 1)
-   }
-   copy(body[1:], tokens[index+1:])
-
-   return cond, body
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-func parse_if(tok *Metatoken) *Node {
-   strip_prefix(tok.toks[0], 3)
-   cond, body := split_by_colon(tok.toks)
-
-   tok.typ = 'K'
-   if body != nil {
-   	tok.toks = make([]*Metatoken, 2)
-   	tok.toks[0] = &Metatoken{toks:cond}
-   	tok.toks[1] = &Metatoken{toks:body}
-   } else {
-   	tok.toks = make([]*Metatoken, 1)
-   	tok.toks[0] = &Metatoken{toks:cond}
-   }
-   
-   node := &Node{}
-	node.typ = "if"
-   node.op = do_if
-   node.tok = tok
-   return node
-}
-
-func is_if(tok *Metatoken) bool {
-	start := []rune("if ")
-   return compare_runes(start, tok.buf)
-}
-
-
-
-func parse_expression(tok *Metatoken) *Node {
-	node := &Node{}
-	node.typ = "expr"
-	node.op = do_subcommand
-	node.tok = tok
-	tok.typ = 'S'
-	return node
-}
-
-
-
-
-func process_token(base *Metatoken) *Node {
-	if base.typ != 'B' {
-		return nil
+	var cond []*Token
+	left := rstrip(text[:pos])
+	if len(left) > 0 {
+		cond = make([]*Token, index+1)
+		cond[index] = &Token{typ: 'T', buf: left}
+	} else {
+		cond = make([]*Token, index)
 	}
-   if len(base.toks) == 0 {
-   	return nil
-   }
-   first := base.toks[0]
-   if first.typ == 'T' {
-      if is_if(first) {
-         return parse_if(base)
-      }
-   }
-   return parse_expression(base)
+	copy(cond, tokens[:index])
+
+	var body []*Token
+	right := lstrip(text[pos+1:])
+	if len(right) > 0 {
+		body = make([]*Token, len(tokens)-index)
+		body[0] = &Token{typ: 'T', buf: right}
+	} else {
+		body = make([]*Token, len(tokens)-index-1)
+	}
+	copy(body[1:], tokens[index+1:])
+
+	return cond, body
+}
+
+
+
+
+
+
+func parse_if(tok *Token) (*Token, *Token) {
+	strip_prefix(tok.toks[0], 2)
+	cond, body := split_by_colon(tok.toks)
+	if body == nil {
+		return &Token{toks: cond}, nil
+	} else {
+		return &Token{typ: 'S', toks: cond}, &Token{typ: 'S', toks: body}
+	}
+}
+
+
+
+
+
+
+
+
+
+func is_end_cmd(tok *Token) bool {
+	if tok.typ != 'S' && tok.typ != 'B' {
+		return false
+	}
+	if len(tok.toks) != 1 || tok.toks[0].typ != 'T' {
+		return false
+	}
+	return equal_runes_str(trim_spaces(tok.toks[0].buf), "end")
+}
+
+func is_if_cmd(tok *Token) bool {
+	if tok.typ != 'S' && tok.typ != 'B' {
+   	return false
+	}
+	if len(tok.toks) == 0 || tok.toks[0].typ != 'T' {
+		return false
+	}
+	start := []rune("if")
+	return compare_runes(start, tok.toks[0].buf)
 }

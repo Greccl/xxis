@@ -4,27 +4,47 @@ import (
 	"fmt"
 )
 
-
 // DataToken TVR
 // BoxToken SQ
 
-
 type Token struct {
-	typ rune
-	buf []rune
+	typ  rune
+	buf  []rune
 	toks []*Token
 }
 
-
 func (tok *Token) repr() string {
-	if len(tok.buf) > 0 {
-		if tok.typ == 'R' {
-			return fmt.Sprintf("%c REG[%d]", tok.typ, tok.buf[0])
+	switch tok.typ {
+	case 'T':
+		return fmt.Sprintf("%s", string(tok.buf))
+	case 'V':
+		return fmt.Sprintf("$%s", string(tok.buf))
+	case 'R':
+		return fmt.Sprintf("{R%d}", tok.buf[0])
+	case 'I':
+		if len(tok.toks) >= 2 {
+			return fmt.Sprintf("IF %s : %s", tok.toks[0].repr(), tok.toks[1].repr())
+		} else if len(tok.toks) == 1 {
+			return fmt.Sprintf("IF %s", tok.toks[0].repr())
 		} else {
-			return fmt.Sprintf("%c '%s'", tok.typ, string(tok.buf))
+			return "IF"
 		}
 	}
-	return fmt.Sprintf("%c", tok.typ)
+	var items string
+	for _, t := range tok.toks {
+		items += t.repr()
+	}
+	switch tok.typ {
+	case 'S', 'B':
+		if len(tok.buf) > 0 {
+			return fmt.Sprintf("CMD R%d %s", tok.buf[0], items)
+		} else {
+			return fmt.Sprintf("CMD -- %s", items)
+		}
+	case 'Q':
+		return fmt.Sprintf("'%s'", items)
+	}
+	return "???"
 }
 
 func (tok *Token) dump() {
@@ -32,21 +52,21 @@ func (tok *Token) dump() {
 }
 
 func (tok *Token) dump_node(prefix []bool, isLast bool) {
-    for i, hasNext := range prefix {
-        if i == len(prefix)-1 {
-            if isLast {
-                fmt.Print("└── ")
-            } else {
-                fmt.Print("├── ")
-            }
-        } else {
-            if hasNext {
-                fmt.Print("│   ")
-            } else {
-                fmt.Print("    ")
-            }
-        }
-    }
+	for i, hasNext := range prefix {
+		if i == len(prefix)-1 {
+			if isLast {
+				fmt.Print("└── ")
+			} else {
+				fmt.Print("├── ")
+			}
+		} else {
+			if hasNext {
+				fmt.Print("│   ")
+			} else {
+				fmt.Print("    ")
+			}
+		}
+	}
 
 	fmt.Printf("%c", tok.typ)
 	if len(tok.buf) > 0 {
@@ -60,9 +80,10 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 
 	newPrefix := make([]bool, len(prefix)+1)
 	copy(newPrefix, prefix)
-   for i, child := range tok.toks {
-   	last := i == len(tok.toks)-1
-		newPrefix[len(newPrefix)-1] = !isLast && !last
-      child.dump_node(newPrefix, last)
-   }
+	for i, child := range tok.toks {
+		last := i == len(tok.toks)-1
+		newPrefix[len(newPrefix)-1] = !last
+		// newPrefix[len(newPrefix)-1] = !isLast && !last
+		child.dump_node(newPrefix, last)
+	}
 }

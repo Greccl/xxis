@@ -1,15 +1,14 @@
 package main
 
 import (
-   "fmt"
+	"fmt"
 )
 
-
-
 func main() {
-	
-	// src0 := "if true; echo 'hola $inter $(echo $inner command)mundo' abc $var; end"
-	src0 := "A $(B '$v0 $(C)' $(D t0 $(E$v2 t1))) t2 $(F)"
+
+	src0 := "cmd 1\nif cmd 2; cmd 3\ncmd 4; end   ;cmd 5"
+	// src0 := "if true; echo 'hola $A $(echo $B com)mundo'\n abc $var; end"
+	// src0 := "A $(B '$v0 $(C)' $(D t0 $(E$v2 t1))) t2 $(F)"
 	fmt.Println("source code:")
 	fmt.Println(src0)
 	fmt.Println()
@@ -17,44 +16,43 @@ func main() {
 	read := enumerate_string(src0)
 	// read := enumerate_file("test.txt")
 
-	fmt.Println("segments:")
+	// fmt.Println("segments:")
 	segments := get_segments(read)
-/*
-	for i, seg := range segments {
-		fmt.Printf("%d | %c: %s\n", i, seg.typ, string(seg.buf))
-	}
-	fmt.Println("")
-*/
+	/*
+		for i, seg := range segments {
+			fmt.Printf("%d | %c: %s\n", i, seg.typ, string(seg.buf))
+		}
+		fmt.Println("")
+	*/
 
 	metas := get_metaexpressions(segments)
 	/*
-	fmt.Println("metaexpressions:", len(metas))
-	for i, meta := range metas {
-		fmt.Printf("%d | %d:", i, len(meta))
-		for _, seg := range meta {
-			fmt.Printf(" %c", seg.typ)
+		fmt.Println("metaexpressions:", len(metas))
+		for i, meta := range metas {
+			fmt.Printf("%d | %d:", i, len(meta))
+			for _, seg := range meta {
+				fmt.Printf(" %c", seg.typ)
+			}
+			fmt.Println()
 		}
-		fmt.Println()
-	}
-	fmt.Println("")
+		fmt.Println("")
 	*/
 
-	fmt.Println("commands:")
-	com := &Compiler{}
-	for _, meta := range metas {
-		fmt.Println()
-		sub := subcmd_by_segment(meta)
-		// sub.dump()
-		com.process(sub)
+	fmt.Println("compiling:")
+	com := New_Compiler()
+	ast := build_ast(metas)
+	for _, tok := range ast {
+		com.process(tok)
+		tok.dump()
 	}
 	fmt.Println()
 
-	
-
 	fmt.Println("program:")
 	vm := &VM{}
-	for _, inst := range com.code {
+	for addr, inst := range com.f.code {
+		fmt.Printf("%d: ", addr)
 		inst.Exec(vm)
+		fmt.Println()
 	}
 	fmt.Println()
 }

@@ -127,7 +127,7 @@ type InstrTest struct {
 }
 
 func (self InstrTest) Exec(vm *VM) {
-	fmt.Println(self.str)
+	fmt.Print(self.str)
 }
 
 
@@ -140,10 +140,6 @@ func (self InstrTest) Exec(vm *VM) {
 type InstrCmd struct {
 	tok *Token
 	out int
-}
-
-func (self *InstrCmd) Dump() string {
-	return "Cmd"
 }
 
 func (self *InstrCmd) Exec(vm *VM) {
@@ -163,10 +159,30 @@ func (self *InstrCmd) Exec(vm *VM) {
 
 
 
+
+
 type InstrJump struct {
+	// -1 continue
+	// -2 break
 	addr int
 }
 
 func (self *InstrJump) Exec(vm *VM) {
-	vm.pc = self.addr
+	// vm.pc = self.addr
+	fmt.Printf("JMP %d", self.addr)
+}
+
+
+
+
+
+
+
+type InstrHalt struct {
+	reason int
+}
+
+func (self *InstrHalt) Exec(vm *VM) {
+	// vm.pc = self.addr
+	fmt.Printf("HLT %d", self.reason)
 }
