@@ -6,7 +6,7 @@ import (
 
 func main() {
 
-	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)\n   cmd 4\nend\ncmd 5"
+	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)\n   if cmd 4: exit\n   last in block\nend\ncmd 5"
 	// src0 := "if true; echo 'hola $A $(echo $B com)mundo'\n abc $var; end"
 	// src0 := "A $(B '$v0 $(C)' $(D t0 $(E$v2 t1))) t2 $(F)"
 	fmt.Println("source code:")
@@ -40,7 +40,7 @@ func main() {
 
 	com := New_Compiler()
 	ast := build_ast(metas)
-	fmt.Println("compiling:")
+	fmt.Println("ast:")
 	for _, tok := range ast.toks {
 		com.process(tok)
 		tok.dump()

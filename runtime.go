@@ -142,12 +142,18 @@ type InstrCmd struct {
 	out int
 }
 
-func (self *InstrCmd) Exec(vm *VM) {
+func (self InstrCmd) Exec(vm *VM) {
 	// 1. construir tokens
 	// b := &ArgBuilder{}
-	for _, t := range self.tok.toks {
 		// t.appendArgsTo(b)
-		t.dump()
+		// t.dump()
+   if self.out >= 0 {
+      fmt.Printf("CMD %02d ", self.out)
+   } else {
+      fmt.Print("CMD -- ")
+   }
+	for _, t := range self.tok.toks {
+		fmt.Printf(t.repr())
 	}
 
 	// 2. definir quien ejecuta
@@ -167,7 +173,7 @@ type InstrJump struct {
 	addr int
 }
 
-func (self *InstrJump) Exec(vm *VM) {
+func (self InstrJump) Exec(vm *VM) {
 	// vm.pc = self.addr
 	fmt.Printf("JMP %d", self.addr)
 }
@@ -182,7 +188,7 @@ type InstrHalt struct {
 	reason int
 }
 
-func (self *InstrHalt) Exec(vm *VM) {
+func (self InstrHalt) Exec(vm *VM) {
 	// vm.pc = self.addr
 	fmt.Printf("HLT %d", self.reason)
 }

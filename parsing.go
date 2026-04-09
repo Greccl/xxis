@@ -462,22 +462,17 @@ func build_ast(metas [][]Segment) *Token {
 			}
 			curr = stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			continue
 		} else if is_if_cmd(cmd) {
 			cond, body := parse_if(cmd)
-			// cond_cmd := wrap_cmd(cond)
+         block := &Token{typ: 'B', toks: make([]*Token, 0)}
+         if_tok := &Token{typ: 'K', buf: []rune("IF"), toks: []*Token{cond, block}}
+         curr.toks = append(curr.toks, if_tok)
 			if body != nil {
-				// body_cmd := wrap_cmd(body)
-				if_tok := &Token{typ: 'K', buf: []rune("IF"), toks: []*Token{cond, body}}
-				curr.toks = append(curr.toks, if_tok)
+            block.toks = append(block.toks, body)
 			} else {
-				block := &Token{typ: 'B', toks: make([]*Token, 0)}
-				if_tok := &Token{typ: 'K', buf: []rune("IF"), toks: []*Token{cond, block}}
-				curr.toks = append(curr.toks, if_tok)
-				stack = append(stack, curr)
-				curr = block
+            stack = append(stack, curr)
+            curr = block
 			}
-			continue
 		} else {
 		   cmd.typ = 'C'
 		   curr.toks = append(curr.toks, cmd) //wrap_cmd(cmd))
@@ -525,8 +520,9 @@ func New_Compiler() *Compiler {
 	return self
 }
 
-func (self *Compiler) push(ins Instruction) {
+func (self *Compiler) push(ins Instruction) int {
 	self.f.code = append(self.f.code, ins)
+	return len(self.f.code) - 1
 }
 
 func (self *Compiler) process(tok *Token) {
@@ -537,6 +533,11 @@ func (self *Compiler) process(tok *Token) {
 		   switch tok.buf[0] {
 		      case 'I':
 		         self.process(tok.toks[0])
+		         i := self.push(&InstrJump{})
+		         for _, t := range tok.toks[1].toks {
+		            self.process(t)
+		         }
+		         self.f.code[i].(*InstrJump).addr = len(self.f.code)
 		   }
    }
 }
@@ -558,6 +559,10 @@ func (self *Compiler) replace(tok *Token, reserved int, add bool) {
 		}
 	}
 	if add {
-		self.f.code = append(self.f.code, InstrTest{str: tok.repr()})
+	   if len(tok.buf) > 0 {
+         self.f.code = append(self.f.code, InstrCmd{tok:tok, out:int(tok.buf[0])})
+	   } else {
+         self.f.code = append(self.f.code, InstrCmd{tok:tok, out:-1})
+	   }
 	}
 }

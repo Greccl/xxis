@@ -30,18 +30,13 @@ func (tok *Token) repr() string {
 		} else {
 			return name
 		}
-	case 'C':
-		if len(tok.toks) == 1 {
-			return fmt.Sprintf("CMD   %s", tok.toks[0].repr())
-		}
-		return "CMD   "
 	}
 	var items string
 	for _, t := range tok.toks {
 		items += t.repr()
 	}
 	switch tok.typ {
-	case 'S':
+	case 'S', 'C':
 		if len(tok.buf) > 0 {
 			return fmt.Sprintf("CMD R%d %s", tok.buf[0], items)
 		} else {

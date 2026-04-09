@@ -94,7 +94,7 @@ func split_by_colon(tokens []*Token) ([]*Token, []*Token) {
 	text := tokens[index].buf
 
 	var cond []*Token
-	left := rstrip(text[:pos])
+	left := rstrip(text[:pos+1])
 	if len(left) > 0 {
 		cond = make([]*Token, index+1)
 		cond[index] = &Token{typ: 'T', buf: left}
