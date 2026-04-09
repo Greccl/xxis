@@ -504,6 +504,7 @@ type CompileFrame struct {
 
 type Compiler struct {
 	funcs map[string]*Function
+	tokens []*Token
 
 	f     *Function
 	stack []*Instruction

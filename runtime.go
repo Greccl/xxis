@@ -20,15 +20,14 @@ type Context struct {
 
 
 
-
+type Instr struct {
+   op int
+   arg int
+}
 
 type Instruction interface {
 	Exec(*VM)
 	// Dump() string
-}
-
-type Function2 struct {
-	addr int
 }
 
 type Program struct {
