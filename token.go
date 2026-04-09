@@ -21,21 +21,27 @@ func (tok *Token) repr() string {
 		return fmt.Sprintf("$%s", string(tok.buf))
 	case 'R':
 		return fmt.Sprintf("{R%d}", tok.buf[0])
-	case 'I':
+	case 'K':
+		name := string(tok.buf)
 		if len(tok.toks) >= 2 {
-			return fmt.Sprintf("IF %s : %s", tok.toks[0].repr(), tok.toks[1].repr())
+			return fmt.Sprintf("%s {%s}:{%s}", name, tok.toks[0].repr(), tok.toks[1].repr())
 		} else if len(tok.toks) == 1 {
-			return fmt.Sprintf("IF %s", tok.toks[0].repr())
+			return fmt.Sprintf("%s {%s}", name, tok.toks[0].repr())
 		} else {
-			return "IF"
+			return name
 		}
+	case 'C':
+		if len(tok.toks) == 1 {
+			return fmt.Sprintf("CMD   %s", tok.toks[0].repr())
+		}
+		return "CMD   "
 	}
 	var items string
 	for _, t := range tok.toks {
 		items += t.repr()
 	}
 	switch tok.typ {
-	case 'S', 'B':
+	case 'S':
 		if len(tok.buf) > 0 {
 			return fmt.Sprintf("CMD R%d %s", tok.buf[0], items)
 		} else {

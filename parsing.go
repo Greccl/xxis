@@ -242,13 +242,6 @@ func get_segments(read IndexedRuneSource) []Segment {
 	return segments
 }
 
-
-
-
-
-
-
-
 type ParseContext0 struct {
 	root  *Token
 	curr  *Token
@@ -263,7 +256,7 @@ type ParseContext0 struct {
 
 func (self *ParseContext0) init() {
 	self.root = &Token{}
-	self.root.typ = 'S'
+	self.root.typ = 'I'
 	self.root.toks = make([]*Token, 0)
 	self.curr = self.root
 	self.stack = make([]*Token, 0)
@@ -313,16 +306,6 @@ func (self *ParseContext0) pop() {
 	self.curr = self.stack[len(self.stack)-1]
 	self.stack = self.stack[0 : len(self.stack)-1]
 }
-
-
-
-
-
-
-
-
-
-
 
 func subcmd_by_text(ctx *ParseContext0) *Token {
 	read := enumerate_runes(ctx.text)
@@ -449,19 +432,24 @@ func subcmd_by_segment(segments []Segment) *Token {
 	return ctx.root
 }
 
+func wrap_cmd(cmd *Token) *Token {
+	if cmd.typ != 'S' {
+		cmd.typ = 'S'
+	}
+	return &Token{typ: 'C', toks: []*Token{cmd}}
+}
 
-
-
-
-
-
-
-
-func build_ast(metas [][]Segment) []*Token {
+func build_ast(metas [][]Segment) *Token {
 	cmds := make([]*Token, 0, len(metas))
 	for _, meta := range metas {
 		cmds = append(cmds, subcmd_by_segment(meta))
 	}
+
+   fmt.Println("instruction as tokens:")
+   for _, tok := range cmds {
+      tok.dump()
+   }
+   fmt.Println()
 
 	root := &Token{typ: 'B', toks: make([]*Token, 0)}
 	curr := root
@@ -475,37 +463,33 @@ func build_ast(metas [][]Segment) []*Token {
 			curr = stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			continue
-		}
-
-		if is_if_cmd(cmd) {
+		} else if is_if_cmd(cmd) {
 			cond, body := parse_if(cmd)
-			if cond.typ == 0 {
-				cond.typ = 'S'
-			}
+			// cond_cmd := wrap_cmd(cond)
 			if body != nil {
-				if_tok := &Token{typ: 'I', toks: []*Token{cond, body}}
+				// body_cmd := wrap_cmd(body)
+				if_tok := &Token{typ: 'K', buf: []rune("IF"), toks: []*Token{cond, body}}
 				curr.toks = append(curr.toks, if_tok)
 			} else {
 				block := &Token{typ: 'B', toks: make([]*Token, 0)}
-				if_tok := &Token{typ: 'I', toks: []*Token{cond, block}}
+				if_tok := &Token{typ: 'K', buf: []rune("IF"), toks: []*Token{cond, block}}
 				curr.toks = append(curr.toks, if_tok)
 				stack = append(stack, curr)
 				curr = block
 			}
 			continue
+		} else {
+		   cmd.typ = 'C'
+		   curr.toks = append(curr.toks, cmd) //wrap_cmd(cmd))
 		}
-
-		curr.toks = append(curr.toks, cmd)
 	}
 
 	if len(stack) > 0 {
-		panic("unclosed if")
+		panic("unclosed block")
 	}
 
-	return root.toks
+	return root
 }
-
-
 
 
 
@@ -546,21 +530,15 @@ func (self *Compiler) push(ins Instruction) {
 }
 
 func (self *Compiler) process(tok *Token) {
-	kw := false
-	/*
-		if tok.typ == 'B' && len(tok.toks) > 0 {
-			if tok.toks[0].typ == 'T' && len(tok.toks[0].buf) > 0 {
-				if is_if(tok.toks[0]) {
-					kw = true
-					cond, body := parse_if(tok)
-
-				}
-			}
-		}
-	*/
-	if !kw {
-		self.replace(tok, 0, true)
-	}
+	switch tok.typ {
+	   case 'C':
+		   self.replace(tok, 0, true)
+		case 'K':
+		   switch tok.buf[0] {
+		      case 'I':
+		         self.process(tok.toks[0])
+		   }
+   }
 }
 
 func (self *Compiler) replace(tok *Token, reserved int, add bool) {

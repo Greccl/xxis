@@ -125,9 +125,9 @@ func parse_if(tok *Token) (*Token, *Token) {
 	strip_prefix(tok.toks[0], 2)
 	cond, body := split_by_colon(tok.toks)
 	if body == nil {
-		return &Token{toks: cond}, nil
+		return &Token{typ: 'C', toks: cond}, nil
 	} else {
-		return &Token{typ: 'S', toks: cond}, &Token{typ: 'S', toks: body}
+		return &Token{typ: 'C', toks: cond}, &Token{typ: 'C', toks: body}
 	}
 }
 
@@ -140,7 +140,7 @@ func parse_if(tok *Token) (*Token, *Token) {
 
 
 func is_end_cmd(tok *Token) bool {
-	if tok.typ != 'S' && tok.typ != 'B' {
+	if tok.typ != 'I' {
 		return false
 	}
 	if len(tok.toks) != 1 || tok.toks[0].typ != 'T' {
@@ -150,7 +150,7 @@ func is_end_cmd(tok *Token) bool {
 }
 
 func is_if_cmd(tok *Token) bool {
-	if tok.typ != 'S' && tok.typ != 'B' {
+	if tok.typ != 'I' {
    	return false
 	}
 	if len(tok.toks) == 0 || tok.toks[0].typ != 'T' {
