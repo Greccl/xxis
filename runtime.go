@@ -2,7 +2,7 @@ package main
 
 import (
 	"unicode"
-	"fmt"
+	// "fmt"
 	// "os/exec"
 )
 
@@ -25,13 +25,30 @@ type Instr struct {
    arg int
 }
 
-type Instruction interface {
-	Exec(*VM)
-	// Dump() string
+const (
+   NOOP int = iota
+   CMD
+   JMP
+   JMPZ
+   JMPN
+   HALT
+   CALL
+)
+
+var OPCODES = []string{
+   "NOOP",
+   "CMD ",
+   "JMP ",
+   "JMPZ",
+   "JMPN",
+   "HALT",
+   "CALL",
 }
 
+
+
 type Program struct {
-	code []Instruction
+	// code []Instruction
 	funcs []Function
 }
 
@@ -40,7 +57,7 @@ type Program struct {
 type VM struct {
 	program *Program
 
-	code []Instruction
+	code []Instr
 	pc int
 	halted bool
 	ctx *Context
@@ -48,13 +65,16 @@ type VM struct {
 
 
 func (vm *VM) run() {
+   LOOP:
 	for {
-   	instr := vm.code[vm.pc]
-   	instr.Exec(vm)
-
-   	if vm.halted {
-			break
-		}
+   	ins := vm.code[vm.pc]
+   	// instr.Exec(vm)
+   	switch ins.op {
+   	   case NOOP:
+   	      continue // USELESS
+   	   case HALT:
+   	      break LOOP
+   	}
 	}
 }
 
@@ -111,83 +131,4 @@ func (self *ArgBuilder) End() {
 		self.args = append(self.args, string(self.curr))
 		self.curr = nil
 	}
-}
-
-
-
-
-
-
-
-
-
-type InstrTest struct {
-	str string
-}
-
-func (self InstrTest) Exec(vm *VM) {
-	fmt.Print(self.str)
-}
-
-
-
-
-
-
-
-
-type InstrCmd struct {
-	tok *Token
-	out int
-}
-
-func (self InstrCmd) Exec(vm *VM) {
-	// 1. construir tokens
-	// b := &ArgBuilder{}
-		// t.appendArgsTo(b)
-		// t.dump()
-   if self.out >= 0 {
-      fmt.Printf("CMD %02d ", self.out)
-   } else {
-      fmt.Print("CMD -- ")
-   }
-	for _, t := range self.tok.toks {
-		fmt.Printf(t.repr())
-	}
-
-	// 2. definir quien ejecuta
-	// 3. ejecutar
-	// 4. guardar resultado en registros
-}
-
-
-
-
-
-
-
-type InstrJump struct {
-	// -1 continue
-	// -2 break
-	addr int
-}
-
-func (self InstrJump) Exec(vm *VM) {
-	// vm.pc = self.addr
-	fmt.Printf("JMP %d", self.addr)
-}
-
-
-
-
-
-
-
-type InstrHalt struct {
-	reason int
-}
-
-func (self InstrHalt) Exec(vm *VM) {
-	// vm.pc = self.addr
-	fmt.Printf("HLT %d", self.reason)
 }

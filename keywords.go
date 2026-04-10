@@ -118,7 +118,15 @@ func split_by_colon(tokens []*Token) ([]*Token, []*Token) {
 
 
 
+const (
+   IF rune = iota
+   FOR
+)
 
+var KEYWORDS = []string{
+   "if",
+   "for",
+}
 
 
 func parse_if(tok *Token) (*Token, *Token) {
@@ -139,14 +147,14 @@ func parse_if(tok *Token) (*Token, *Token) {
 
 
 
-func is_end_cmd(tok *Token) bool {
+func is_single_word(tok *Token, word string) bool {
 	if tok.typ != 'I' {
 		return false
 	}
 	if len(tok.toks) != 1 || tok.toks[0].typ != 'T' {
 		return false
 	}
-	return equal_runes_str(trim_spaces(tok.toks[0].buf), "end")
+	return equal_runes_str(trim_spaces(tok.toks[0].buf), word)
 }
 
 func is_if_cmd(tok *Token) bool {

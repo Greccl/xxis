@@ -445,34 +445,52 @@ func build_ast(metas [][]Segment) *Token {
 		cmds = append(cmds, subcmd_by_segment(meta))
 	}
 
+   /*
    fmt.Println("instruction as tokens:")
    for _, tok := range cmds {
       tok.dump()
    }
    fmt.Println()
+   */
 
 	root := &Token{typ: 'B', toks: make([]*Token, 0)}
 	curr := root
 	stack := make([]*Token, 0)
+	var pcurr *Token
+	pstack := make([]*Token, 0)
 
 	for _, cmd := range cmds {
-		if is_end_cmd(cmd) {
+		if is_single_word(cmd, "end") {
 			if len(stack) == 0 {
 				panic("unexpected end")
 			}
 			curr = stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
+			pcurr = pstack[len(pstack)-1]
+			pstack = pstack[:len(pstack)-1]
 		} else if is_if_cmd(cmd) {
 			cond, body := parse_if(cmd)
          block := &Token{typ: 'B', toks: make([]*Token, 0)}
-         if_tok := &Token{typ: 'K', buf: []rune("IF"), toks: []*Token{cond, block}}
+         if_tok := &Token{typ: 'K', buf: []rune{IF}, toks: []*Token{cond, block, nil}}
          curr.toks = append(curr.toks, if_tok)
 			if body != nil {
             block.toks = append(block.toks, body)
 			} else {
             stack = append(stack, curr)
+            pstack = append(pstack, pcurr)
             curr = block
+            pcurr = if_tok
 			}
+      } else if is_single_word(cmd, "else") {
+         if pcurr == nil {
+            panic("else outside if / 1")
+         }
+         if pcurr.buf[0] != IF {
+            panic("else outside if / 2")
+         }
+         block := &Token{typ: 'B', toks: make([]*Token, 0)}
+         pcurr.toks[2] = block
+         curr = block
 		} else {
 		   cmd.typ = 'C'
 		   curr.toks = append(curr.toks, cmd) //wrap_cmd(cmd))
@@ -494,20 +512,20 @@ func build_ast(metas [][]Segment) *Token {
 
 
 type Function struct {
-	code []Instruction
+	code []Instr
 }
 
 type CompileFrame struct {
 	f *Function
-	s []*Instruction
+	// s []*Instruction
 }
 
 type Compiler struct {
 	funcs map[string]*Function
 	tokens []*Token
 
-	f     *Function
-	stack []*Instruction
+	f *Function
+	// stack []*Instruction
 
 	frames []CompileFrame
 }
@@ -515,14 +533,15 @@ type Compiler struct {
 func New_Compiler() *Compiler {
 	self := &Compiler{}
 	self.funcs = make(map[string]*Function)
+	self.tokens = make([]*Token, 0)
 	self.f = &Function{}
-	self.f.code = make([]Instruction, 0)
+	self.f.code = make([]Instr, 0)
 	self.funcs["main"] = self.f
 	return self
 }
 
-func (self *Compiler) push(ins Instruction) int {
-	self.f.code = append(self.f.code, ins)
+func (self *Compiler) push(op, val int) int {
+	self.f.code = append(self.f.code, Instr{op, val})
 	return len(self.f.code) - 1
 }
 
@@ -532,13 +551,28 @@ func (self *Compiler) process(tok *Token) {
 		   self.replace(tok, 0, true)
 		case 'K':
 		   switch tok.buf[0] {
-		      case 'I':
+		      case IF:
 		         self.process(tok.toks[0])
-		         i := self.push(&InstrJump{})
-		         for _, t := range tok.toks[1].toks {
-		            self.process(t)
-		         }
-		         self.f.code[i].(*InstrJump).addr = len(self.f.code)
+		         if tok.toks[2] == nil {
+		            // has not else
+   		         i := self.push(JMPN, 0)
+   		         for _, t := range tok.toks[1].toks {
+   		            self.process(t)
+   		         }
+   		         self.f.code[i].arg = len(self.f.code)
+   		      } else {
+   		         // has else
+   		         i := self.push(JMPN, 0)
+   		         for _, t := range tok.toks[1].toks {
+   		            self.process(t)
+   		         }
+   		         i2 := self.push(JMP, 0)
+   		         self.f.code[i].arg = len(self.f.code)
+   		         for _, t := range tok.toks[2].toks {
+   		            self.process(t)
+   		         }
+   		         self.f.code[i2].arg = len(self.f.code)
+   		      }
 		   }
    }
 }
@@ -560,10 +594,7 @@ func (self *Compiler) replace(tok *Token, reserved int, add bool) {
 		}
 	}
 	if add {
-	   if len(tok.buf) > 0 {
-         self.f.code = append(self.f.code, InstrCmd{tok:tok, out:int(tok.buf[0])})
-	   } else {
-         self.f.code = append(self.f.code, InstrCmd{tok:tok, out:-1})
-	   }
+      self.push(CMD, len(self.tokens))
+      self.tokens = append(self.tokens, tok)
 	}
 }

@@ -22,11 +22,14 @@ func (tok *Token) repr() string {
 	case 'R':
 		return fmt.Sprintf("{R%d}", tok.buf[0])
 	case 'K':
-		name := string(tok.buf)
-		if len(tok.toks) >= 2 {
-			return fmt.Sprintf("%s {%s}:{%s}", name, tok.toks[0].repr(), tok.toks[1].repr())
+		name := KEYWORDS[tok.buf[0]]
+		panic("request K repr")
+		if len(tok.toks) == 3 {
+			return fmt.Sprintf("%s {%c}:{%c}:{%c}", name, tok.toks[0].typ, tok.toks[1].typ, tok.toks[2].typ)
+		} else if len(tok.toks) == 2 {
+			return fmt.Sprintf("%s {%c}:{%c}", name, tok.toks[0].typ, tok.toks[1].typ)
 		} else if len(tok.toks) == 1 {
-			return fmt.Sprintf("%s {%s}", name, tok.toks[0].repr())
+			return fmt.Sprintf("%s {%c}", name, tok.toks[0].typ)
 		} else {
 			return name
 		}
@@ -69,15 +72,22 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 		}
 	}
 
-	fmt.Printf("%c", tok.typ)
-	if len(tok.buf) > 0 {
-		if tok.typ == 'R' {
-			fmt.Printf(" REG[%d]", tok.buf[0])
-		} else {
-			fmt.Printf(" '%s'", string(tok.buf))
-		}
+   if tok != nil {
+   	fmt.Printf("%c", tok.typ)
+   	if len(tok.buf) > 0 {
+   		if tok.typ == 'R' {
+   			fmt.Printf(" REG[%d]", tok.buf[0])
+   		} else if tok.typ == 'K' {
+   		   fmt.Printf(" < %s >", KEYWORDS[tok.buf[0]])
+   		} else {
+   			fmt.Printf(" '%s'", string(tok.buf))
+   		}
+   	}
+	   fmt.Println()
+	} else {
+	   fmt.Printf("@NIL\n")
+	   return
 	}
-	fmt.Println()
 
 	newPrefix := make([]bool, len(prefix)+1)
 	copy(newPrefix, prefix)
