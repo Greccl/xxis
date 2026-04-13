@@ -17,11 +17,6 @@ func check(e error) {
 	}
 }
 
-type IndexedRune struct {
-	i int
-	r rune
-}
-
 type IndexedRuneSource func() (int, rune, bool)
 
 func enumerate_file(path string) IndexedRuneSource {
@@ -106,6 +101,11 @@ func trim_buffer(buf []rune, left, right bool) []rune {
 
 	return buf[start:end]
 }
+
+
+
+
+
 
 type Segment struct {
 	typ    rune
@@ -625,11 +625,12 @@ func (self *Compiler) splitAndOr(tok *Token) *Token {
 	block := &Token{typ: 'B', toks: make([]*Token, len(parts))}
 	for i, part := range parts {
 		if i > 0 {
-		   part.typ = 'K'
-			part.buf = []rune{IFN}
-			if ops[i-1] == '&' {
-			   part.buf[0] = IFZ
-			}
+		   part.typ = ops[i-1]
+		   // part.typ = 'K'
+			// part.buf = []rune{IFN}
+			// if ops[i-1] == '&' {
+			   // part.buf[0] = IFZ
+			// }
 		}
 		block.toks[i] = part
 	}
@@ -642,12 +643,11 @@ func (self *Compiler) process(tok *Token) {
 	      split := self.splitAndOr(tok)
 	      if split.typ == 'B' {
 	      	for _, t := range split.toks {
-   		      // self.replace(t, 0, true)
    		      self.process(t)
 	      	}
 	      } else {
+	         // fmt.Printf("try to teplace %s\n", split.repr())
    		   self.replace(split, 0, true)
-   		   // self.process(split)
 	      }
 		case 'K':
 		   switch tok.buf[0] {
@@ -666,24 +666,20 @@ func (self *Compiler) process(tok *Token) {
    		         }
    		         self.f.code[i].arg = len(self.f.code)
    		      }
-   		   case IFZ:
-   		      // fmt.Println("::: PROCESS IFZ", tok.repr())
-   		      self.push(JMPN, len(self.f.code)+2)
-   		      tok.typ = 'C'
-   		      tok.buf = nil
-   		      self.replace(tok, 0, true)
-   		   case IFN:
-   		      // fmt.Println("::: PROCESS IFN")
-   		      self.push(JMPZ, len(self.f.code)+2)
-   		      tok.typ = 'C'
-   		      tok.buf = nil
-   		      self.replace(tok, 0, true)
 		   }
+      case '&':
+        self.push(JMPN, len(self.f.code)+2)
+        tok.typ = 'C'
+        self.replace(tok, 0, true)
+      case '|':
+        self.push(JMPZ, len(self.f.code)+2)
+        tok.typ = 'C'
+        self.replace(tok, 0, true)
    }
 }
 
 func (self *Compiler) replace(tok *Token, reserved int, add bool) {
-   fmt.Printf("replace %c %d %s\n", tok.typ, reserved, tok.repr())
+   // fmt.Printf("replace %c %d %s\n", tok.typ, reserved, tok.repr())
 	for i := 0; i < len(tok.toks); i++ {
 		t := tok.toks[i]
 		switch t.typ {
@@ -696,7 +692,7 @@ func (self *Compiler) replace(tok *Token, reserved int, add bool) {
 			tok.toks[i] = replacement
 		case 'Q':
 			self.replace(t, reserved, false)
-			reserved++
+			// reserved++
 		}
 	}
 	if add {

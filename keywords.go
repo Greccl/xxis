@@ -111,7 +111,7 @@ func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
 	text := tokens[index].buf
 
 	var cond []*Token
-	left := rstrip(text[:pos+1])
+	left := rstrip(text[:pos])
 	if len(left) > 0 {
 		cond = make([]*Token, index+1)
 		cond[index] = &Token{typ: 'T', buf: left}
