@@ -14,8 +14,10 @@ func lstrip(s []rune) []rune {
 	for i < len(s) && is_space(s[i]) {
 		i++
 	}
-	out := make([]rune, len(s)-i)
-	copy(out, s[i:])
+	if i == 0 { return s }
+	// out := make([]rune, len(s)-i)
+	// copy(out, s[i:])
+	out := s[i:]
 	return out
 }
 
@@ -24,8 +26,10 @@ func rstrip(s []rune) []rune {
 	for i > 0 && is_space(s[i]) {
 		i--
 	}
-	out := make([]rune, i)
-	copy(out, s[:i+1])
+	if i == len(s) - 1 { return s }
+	// out := make([]rune, i)
+	// copy(out, s[:i+1])
+	out := s[:i+1]
 	return out
 }
 
@@ -61,8 +65,9 @@ func strip_prefix(tok *Token, i int) {
 	tok.buf = lstrip(tok.buf[i:])
 }
 
-func find(s []rune, target rune) int {
+func find(s []rune, target rune, from int) int {
 	for i, r := range s {
+	   if i < from { continue }
 		if r == target {
 			return i
 		}
@@ -70,27 +75,39 @@ func find(s []rune, target rune) int {
 	return -1
 }
 
-func find_colon(toks []*Token) (int, int) {
-	for i := 0; i < len(toks); i++ {
+func find_rune_in_T(toks []*Token, r rune, index, pos int) (int, int) {
+   if index >= len(toks) {
+      return -1, 0
+   }
+   if pos >= len(toks[index].buf) {
+      return -1, 0
+   }
+   p := pos
+	for i := index; i < len(toks); i++ {
 		t := toks[i]
 		if t.typ != 'T' {
 			continue
 		}
-		pos := find(t.buf, ':')
-		if pos != -1 {
-			return i, pos
+		found := find(t.buf, r, p)
+		if found != -1 {
+			return i, found
 		}
+		p = 0
 	}
 	return -1, 0
 }
 
 func split_by_colon(tokens []*Token) ([]*Token, []*Token) {
-	index, pos := find_colon(tokens)
+	index, pos := find_rune_in_T(tokens, ':', 0, 0)
 
 	if index == -1 {
 		return tokens, nil
 	}
 
+   return split_tokens_at(tokens, index, pos)
+}
+
+func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
 	text := tokens[index].buf
 
 	var cond []*Token
@@ -120,11 +137,15 @@ func split_by_colon(tokens []*Token) ([]*Token, []*Token) {
 
 const (
    IF rune = iota
+   IFZ
+   IFN
    FOR
 )
 
 var KEYWORDS = []string{
    "if",
+   "ifz",
+   "ifn",
    "for",
 }
 

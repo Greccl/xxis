@@ -432,28 +432,13 @@ func subcmd_by_segment(segments []Segment) *Token {
 	return ctx.root
 }
 
-func wrap_cmd(cmd *Token) *Token {
-	if cmd.typ != 'S' {
-		cmd.typ = 'S'
-	}
-	return &Token{typ: 'C', toks: []*Token{cmd}}
-}
-
 func build_ast(metas [][]Segment) *Token {
 	cmds := make([]*Token, 0, len(metas))
 	for _, meta := range metas {
 		cmds = append(cmds, subcmd_by_segment(meta))
 	}
 
-   /*
-   fmt.Println("instruction as tokens:")
-   for _, tok := range cmds {
-      tok.dump()
-   }
-   fmt.Println()
-   */
-
-	root := &Token{typ: 'B', toks: make([]*Token, 0)}
+	root := &Token{typ: 'F', toks: make([]*Token, 0)}
 	curr := root
 	stack := make([]*Token, 0)
 	var pcurr *Token
@@ -493,7 +478,7 @@ func build_ast(metas [][]Segment) *Token {
          curr = block
 		} else {
 		   cmd.typ = 'C'
-		   curr.toks = append(curr.toks, cmd) //wrap_cmd(cmd))
+		   curr.toks = append(curr.toks, cmd)
 		}
 	}
 
@@ -545,39 +530,160 @@ func (self *Compiler) push(op, val int) int {
 	return len(self.f.code) - 1
 }
 
+func (self *Compiler) finish() {
+	self.push(HALT, 0)
+}
+
+func (self *Compiler) splitAndOr(tok *Token) *Token {
+	if tok.typ != 'C' {
+		return tok
+	}
+
+	findOp := func(buf []rune, from int) (int, rune) {
+		for i := from; i < len(buf)-1; i++ {
+			if buf[i] == '&' && buf[i+1] == '&' {
+				return i, '&'
+			}
+			if buf[i] == '|' && buf[i+1] == '|' {
+				return i, '|'
+			}
+		}
+		return -1, 0
+	}
+
+	parts := make([]*Token, 0, 2)
+	ops := make([]rune, 0, 1)
+	curr := make([]*Token, 0)
+	stripLeft := false
+	found := false
+
+	for _, t := range tok.toks {
+		if t.typ != 'T' {
+			if stripLeft {
+				stripLeft = false
+			}
+			curr = append(curr, t)
+			continue
+		}
+
+		buf := t.buf
+		if stripLeft {
+			buf = lstrip(buf)
+			stripLeft = false
+		}
+
+		pos := 0
+		for {
+			opPos, op := findOp(buf, pos)
+			if opPos == -1 {
+				if pos == 0 {
+					if len(buf) > 0 {
+						curr = append(curr, &Token{typ: 'T', buf: buf})
+					}
+				} else if pos < len(buf) {
+					frag := buf[pos:]
+					if len(frag) > 0 {
+						curr = append(curr, &Token{typ: 'T', buf: frag})
+					}
+				}
+				break
+			}
+
+			found = true
+			left := rstrip(buf[pos:opPos])
+			if len(left) > 0 {
+				curr = append(curr, &Token{typ: 'T', buf: left})
+			}
+
+			if len(curr) > 0 {
+				parts = append(parts, &Token{typ: 'C', toks: curr})
+				ops = append(ops, op)
+			}
+			curr = make([]*Token, 0)
+
+			pos = opPos + 2
+			for pos < len(buf) && is_space(buf[pos]) {
+				pos++
+			}
+			if pos >= len(buf) {
+				stripLeft = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		return tok
+	}
+	if len(curr) > 0 {
+		parts = append(parts, &Token{typ: 'C', toks: curr})
+	}
+	if len(parts) == 0 || len(ops) == 0 || len(parts) != len(ops)+1 {
+		return tok
+	}
+
+	block := &Token{typ: 'B', toks: make([]*Token, len(parts))}
+	for i, part := range parts {
+		if i > 0 {
+		   part.typ = 'K'
+			part.buf = []rune{IFN}
+			if ops[i-1] == '&' {
+			   part.buf[0] = IFZ
+			}
+		}
+		block.toks[i] = part
+	}
+	return block
+}
+
 func (self *Compiler) process(tok *Token) {
 	switch tok.typ {
 	   case 'C':
-		   self.replace(tok, 0, true)
+	      split := self.splitAndOr(tok)
+	      if split.typ == 'B' {
+	      	for _, t := range split.toks {
+   		      // self.replace(t, 0, true)
+   		      self.process(t)
+	      	}
+	      } else {
+   		   self.replace(split, 0, true)
+   		   // self.process(split)
+	      }
 		case 'K':
 		   switch tok.buf[0] {
 		      case IF:
 		         self.process(tok.toks[0])
-		         if tok.toks[2] == nil {
-		            // has not else
-   		         i := self.push(JMPN, 0)
-   		         for _, t := range tok.toks[1].toks {
-   		            self.process(t)
-   		         }
-   		         self.f.code[i].arg = len(self.f.code)
-   		      } else {
-   		         // has else
-   		         i := self.push(JMPN, 0)
-   		         for _, t := range tok.toks[1].toks {
-   		            self.process(t)
-   		         }
-   		         i2 := self.push(JMP, 0)
-   		         self.f.code[i].arg = len(self.f.code)
+		         i := self.push(JMPN, 0)
+		         for _, t := range tok.toks[1].toks {
+		            self.process(t)
+		         }
+   		      self.f.code[i].arg = len(self.f.code)
+		         if tok.toks[2] != nil {
+   		         self.f.code[i].arg++
+   		         i = self.push(JMP, 0)
    		         for _, t := range tok.toks[2].toks {
    		            self.process(t)
    		         }
-   		         self.f.code[i2].arg = len(self.f.code)
+   		         self.f.code[i].arg = len(self.f.code)
    		      }
+   		   case IFZ:
+   		      // fmt.Println("::: PROCESS IFZ", tok.repr())
+   		      self.push(JMPN, len(self.f.code)+2)
+   		      tok.typ = 'C'
+   		      tok.buf = nil
+   		      self.replace(tok, 0, true)
+   		   case IFN:
+   		      // fmt.Println("::: PROCESS IFN")
+   		      self.push(JMPZ, len(self.f.code)+2)
+   		      tok.typ = 'C'
+   		      tok.buf = nil
+   		      self.replace(tok, 0, true)
 		   }
    }
 }
 
 func (self *Compiler) replace(tok *Token, reserved int, add bool) {
+   fmt.Printf("replace %c %d %s\n", tok.typ, reserved, tok.repr())
 	for i := 0; i < len(tok.toks); i++ {
 		t := tok.toks[i]
 		switch t.typ {

@@ -23,7 +23,6 @@ func (tok *Token) repr() string {
 		return fmt.Sprintf("{R%d}", tok.buf[0])
 	case 'K':
 		name := KEYWORDS[tok.buf[0]]
-		panic("request K repr")
 		if len(tok.toks) == 3 {
 			return fmt.Sprintf("%s {%c}:{%c}:{%c}", name, tok.toks[0].typ, tok.toks[1].typ, tok.toks[2].typ)
 		} else if len(tok.toks) == 2 {

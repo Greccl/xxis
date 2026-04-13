@@ -6,7 +6,7 @@ import (
 
 func main() {
 
-	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)\n   if cmd 4: exit\n   last in block\nelse\n   it works\nend\ncmd 5"
+	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)\n   if cmd 4: exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
 	// src0 := "if true; echo 'hola $A $(echo $B com)mundo'\n abc $var; end"
 	// src0 := "A $(B '$v0 $(C)' $(D t0 $(E$v2 t1))) t2 $(F)"
 	fmt.Println("--> source code")
@@ -46,6 +46,7 @@ func main() {
 	for _, tok := range ast.toks {
 		com.process(tok)
 	}
+	com.finish()
 	fmt.Println()
 
 
@@ -56,7 +57,6 @@ func main() {
 	fmt.Println()
 
 	fmt.Println("--> program")
-	// vm := &VM{}
 	for i, inst := range com.f.code {
 		fmt.Printf("%02d: %s %d\n", i, OPCODES[inst.op], inst.arg)
 	}
