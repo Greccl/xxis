@@ -4,7 +4,43 @@ import (
 	"fmt"
 )
 
+
 func main() {
+   // read := enumerate_file("test1.txt")
+	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)$(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
+	fmt.Println("--> source code")
+	fmt.Println(src0)
+	fmt.Println()
+
+	read := enumerate_string(src0)
+	next := enumerate_tokens(read)
+	ast := build_ast_from_tokens(next)
+
+	// fmt.Println("--> AST")
+	// ast.dump()
+
+	com := New_Compiler()
+	for _, tok := range ast.toks {
+		com.process(tok)
+	}
+	com.finish()
+
+   fmt.Println()
+	fmt.Println("--> value table")
+	for i, t := range com.tokens {
+	   fmt.Printf("%02d %s\n", i, t.repr())
+	}
+	fmt.Println()
+
+	fmt.Println("--> program")
+	for i, inst := range com.f.code {
+		fmt.Printf("%02d: %s %d\n", i, OPCODES[inst.op], inst.arg)
+	}
+	fmt.Println()
+}
+
+
+func main2() {
 
 	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)$(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
 	// src0 := "if true; echo 'hola $A $(echo $B com)mundo'\n abc $var; end"
