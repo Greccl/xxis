@@ -113,6 +113,7 @@ type Segment struct {
 	buf    []rune
 }
 
+/*
 func get_segments(read IndexedRuneSource) []Segment {
 	m := 0
 	escape := false
@@ -241,6 +242,7 @@ func get_segments(read IndexedRuneSource) []Segment {
 
 	return segments
 }
+*/
 
 type ParseContext0 struct {
 	root  *Token
@@ -395,6 +397,7 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 	return ctx.root
 }
 
+/*
 func get_metaexpressions(segments []Segment) [][]Segment {
 	res := make([][]Segment, 0)
 	acc := make([]Segment, 0)
@@ -412,6 +415,7 @@ func get_metaexpressions(segments []Segment) [][]Segment {
 	}
 	return res
 }
+*/
 
 func subcmd_by_segment(segments []Segment) *Token {
 	ctx := &ParseContext0{}
@@ -432,6 +436,7 @@ func subcmd_by_segment(segments []Segment) *Token {
 	return ctx.root
 }
 
+/*
 func build_ast(metas [][]Segment) *Token {
 	cmds := make([]*Token, 0, len(metas))
 	for _, meta := range metas {
@@ -488,7 +493,7 @@ func build_ast(metas [][]Segment) *Token {
 
 	return root
 }
-
+*/
 
 
 
@@ -624,14 +629,7 @@ func (self *Compiler) splitAndOr(tok *Token) *Token {
 
 	block := &Token{typ: 'B', toks: make([]*Token, len(parts))}
 	for i, part := range parts {
-		if i > 0 {
-		   part.typ = ops[i-1]
-		   // part.typ = 'K'
-			// part.buf = []rune{IFN}
-			// if ops[i-1] == '&' {
-			   // part.buf[0] = IFZ
-			// }
-		}
+		if i > 0 { part.typ = ops[i-1] }
 		block.toks[i] = part
 	}
 	return block

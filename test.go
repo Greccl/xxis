@@ -6,6 +6,15 @@ import (
 
 
 func main() {
+   defer func() {
+      if err := recover(); err != nil {
+         switch x := err.(type) {
+         case CompileError:
+            fmt.Println("error detected")
+            fmt.Println(x)
+         }
+      }
+   }()
    // read := enumerate_file("test1.txt")
 	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)$(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
 	fmt.Println("--> source code")
@@ -16,8 +25,8 @@ func main() {
 	next := enumerate_tokens(read)
 	ast := build_ast_from_tokens(next)
 
-	// fmt.Println("--> AST")
-	// ast.dump()
+	fmt.Println("--> AST")
+	ast.dump()
 
 	com := New_Compiler()
 	for _, tok := range ast.toks {
@@ -39,7 +48,6 @@ func main() {
 	fmt.Println()
 }
 
-
 func main2() {
 
 	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)$(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
@@ -49,11 +57,11 @@ func main2() {
 	fmt.Println(src0)
 	fmt.Println()
 
-	read := enumerate_string(src0)
+	// read := enumerate_string(src0)
 	// read := enumerate_file("test.txt")
 
 	// fmt.Println("segments:")
-	segments := get_segments(read)
+	// segments := get_segments(read)
 	/*
 		for i, seg := range segments {
 			fmt.Printf("%d | %c: %s\n", i, seg.typ, string(seg.buf))
@@ -61,7 +69,7 @@ func main2() {
 		fmt.Println("")
 	*/
 
-	metas := get_metaexpressions(segments)
+	// metas := get_metaexpressions(segments)
 	/*
 		fmt.Println("metaexpressions:", len(metas))
 		for i, meta := range metas {
@@ -74,6 +82,7 @@ func main2() {
 		fmt.Println("")
 	*/
 
+   /*
 	ast := build_ast(metas)
 	fmt.Println("--> AST")
 	ast.dump()
@@ -97,4 +106,5 @@ func main2() {
 		fmt.Printf("%02d: %s %d\n", i, OPCODES[inst.op], inst.arg)
 	}
 	fmt.Println()
+	*/
 }

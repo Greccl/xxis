@@ -4,9 +4,6 @@ import (
 	"fmt"
 )
 
-// DataToken TVR
-// BoxToken SQ
-
 type Token struct {
 	typ  rune
 	buf  []rune
