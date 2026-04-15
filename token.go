@@ -8,6 +8,7 @@ type Token struct {
 	typ  rune
 	buf  []rune
 	toks []*Token
+
 }
 
 func (tok *Token) repr() string {

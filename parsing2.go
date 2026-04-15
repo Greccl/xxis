@@ -16,8 +16,6 @@ func enumerate_tokens(read IndexedRuneSource) TokenSource {
 	var quote rune = 0
 	strip := true
 
-	line := 1
-
 	meta := make([]Segment, 0)
 	var pending *Token
 	done := false
@@ -56,8 +54,6 @@ func enumerate_tokens(read IndexedRuneSource) TokenSource {
 
 		for {
 			i, r, eof := read()
-
-			if r == '\n' { line++ }
 
 			if escape {
 				escape = false
