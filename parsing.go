@@ -421,7 +421,7 @@ func subcmd_by_segment(segments []Segment) *Token {
 	ctx := &ParseContext0{}
 	ctx.init()
 	for _, seg := range segments {
-		if seg.typ == 'S' || seg.typ == 'D' {
+		if seg.typ == 'Q' {
 			subctx := &ParseContext0{}
 			subctx.init()
 			subctx.new_segment(seg.buf)

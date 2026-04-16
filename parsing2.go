@@ -120,11 +120,7 @@ func enumerate_tokens(read IndexedRuneSource) TokenSource {
 						}
 					}
 					m = i + 1
-					if r == '"' {
-						typ = 'D'
-					} else {
-						typ = 'S'
-					}
+					typ = 'Q'
 					quote = r
 				} else {
 					if quote == r {
