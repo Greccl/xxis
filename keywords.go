@@ -9,51 +9,16 @@ func compare_runes(a, b []rune) bool {
 	return true
 }
 
-func lstrip(s []rune) []rune {
-	i := 0
-	for i < len(s) && is_space(s[i]) {
-		i++
-	}
-	if i == 0 { return s }
-	// out := make([]rune, len(s)-i)
-	// copy(out, s[i:])
-	out := s[i:]
-	return out
-}
-
-func rstrip(s []rune) []rune {
-	i := len(s) - 1
-	for i > 0 && is_space(s[i]) {
-		i--
-	}
-	if i == len(s) - 1 { return s }
-	// out := make([]rune, i)
-	// copy(out, s[:i+1])
-	out := s[:i+1]
-	return out
-}
-
 func is_space(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
-func trim_spaces(s []rune) []rune {
-	start := 0
-	end := len(s)
-	for start < end && is_space(s[start]) {
-		start++
-	}
-	for end > start && is_space(s[end-1]) {
-		end--
-	}
-	return s[start:end]
-}
-
 func equal_runes_str(s []rune, word string) bool {
-	if len(s) != len(word) {
+   w := []rune(word)
+	if len(s) != len(w) {
 		return false
 	}
-	for i, r := range word {
+	for i, r := range w {
 		if s[i] != r {
 			return false
 		}
@@ -62,7 +27,7 @@ func equal_runes_str(s []rune, word string) bool {
 }
 
 func strip_prefix(tok *Token, i int) {
-	tok.buf = lstrip(tok.buf[i:])
+	tok.buf = trim_buffer(tok.buf[i:], true, false)
 }
 
 func find(s []rune, target rune, from int) int {
@@ -111,7 +76,7 @@ func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
 	text := tokens[index].buf
 
 	var cond []*Token
-	left := rstrip(text[:pos])
+	left := trim_buffer(text[:pos], false, true)
 	if len(left) > 0 {
 		cond = make([]*Token, index+1)
 		cond[index] = &Token{typ: 'T', buf: left}
@@ -121,7 +86,7 @@ func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
 	copy(cond, tokens[:index])
 
 	var body []*Token
-	right := lstrip(text[pos+1:])
+	right := trim_buffer(text[pos+1:], true, false)
 	if len(right) > 0 {
 		body = make([]*Token, len(tokens)-index)
 		body[0] = &Token{typ: 'T', buf: right}
@@ -175,7 +140,7 @@ func is_single_word(tok *Token, word string) bool {
 	if len(tok.toks) != 1 || tok.toks[0].typ != 'T' {
 		return false
 	}
-	return equal_runes_str(trim_spaces(tok.toks[0].buf), word)
+	return equal_runes_str(trim_buffer(tok.toks[0].buf, true, true), word)
 }
 
 func is_if_cmd(tok *Token) bool {

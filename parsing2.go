@@ -34,7 +34,7 @@ func enumerate_tokens(read IndexedRuneSource) TokenSource {
 
 	emit := func(seg Segment) bool {
 		switch seg.typ {
-		case 'R', 'S', 'D':
+		case 'R', 'Q':
 			meta = append(meta, seg)
 		case ';':
 			strip = true

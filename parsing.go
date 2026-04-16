@@ -573,7 +573,7 @@ func (self *Compiler) splitAndOr(tok *Token) *Token {
 
 		buf := t.buf
 		if stripLeft {
-			buf = lstrip(buf)
+			buf = trim_buffer(buf, true, false)
 			stripLeft = false
 		}
 
@@ -595,7 +595,7 @@ func (self *Compiler) splitAndOr(tok *Token) *Token {
 			}
 
 			found = true
-			left := rstrip(buf[pos:opPos])
+			left := trim_buffer(buf[pos:opPos], false, true)
 			if len(left) > 0 {
 				curr = append(curr, &Token{typ: 'T', buf: left})
 			}
