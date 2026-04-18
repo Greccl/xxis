@@ -19,7 +19,7 @@ func main() {
 
 
    // read := enumerate_file("test1.txt")
-	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)$(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
+	src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)!(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
 	fmt.Println("--> source code")
 	fmt.Println(src0)
 	fmt.Println()

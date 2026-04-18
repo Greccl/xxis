@@ -1,0 +1,9 @@
+cmd 1
+if $(cmd 2) "hola mundo"
+   cmd '3' $(hola)$(mundo)
+   if cmd 4   :   exit
+   last in block
+else
+   it works
+end
+cmd 5 && cmd '6 $var6' || cmd 7

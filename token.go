@@ -36,12 +36,10 @@ func (tok *Token) repr() string {
 		items += t.repr()
 	}
 	switch tok.typ {
-	case 'S', 'C':
-		if len(tok.buf) > 0 {
-			return fmt.Sprintf("CMD R%d %s", tok.buf[0], items)
-		} else {
-			return fmt.Sprintf("CMD -- %s", items)
-		}
+	case 'S':
+		return fmt.Sprintf("CMD R%d (%c) %s", tok.buf[1], tok.buf[0], items)
+	case 'C':
+		return fmt.Sprintf("CMD -- %s", items)
 	case 'Q':
 		return fmt.Sprintf("'%s'", items)
 	}
@@ -72,13 +70,19 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
    if tok != nil {
    	fmt.Printf("%c", tok.typ)
    	if len(tok.buf) > 0 {
-   		if tok.typ == 'R' {
+   	   switch tok.typ {
+   		case 'R':
    			fmt.Printf(" REG[%d]", tok.buf[0])
-   		} else if tok.typ == 'K' {
-   		   fmt.Printf(" < %s >", KEYWORDS[tok.buf[0]])
-   		} else {
+   		case 'K':
+   		   fmt.Printf(" {%s}", KEYWORDS[tok.buf[0]])
+   		case 'S':
+   			fmt.Printf(" {%c}", tok.buf[0])
+   			if tok.buf[1] >= 0 {
+   			   fmt.Printf(" -> %d", tok.buf[1])
+   			}
+   		default:
    			fmt.Printf(" '%s'", string(tok.buf))
-   		}
+   	   }
    	}
 	   fmt.Println()
 	} else {

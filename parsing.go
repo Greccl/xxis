@@ -284,8 +284,8 @@ func (self *ParseContext0) append_text(i int) {
 	}
 }
 
-func (self *ParseContext0) start_subcmd() {
-	sub := &Token{'S', nil, make([]*Token, 0)}
+func (self *ParseContext0) start_subcmd(t rune) {
+	sub := &Token{'S', []rune{t, -1}, make([]*Token, 0)}
 	self.append_token(sub)
 	self.push(sub)
 }
@@ -341,6 +341,11 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 			continue
 		}
 
+		if ctx.state == 0 && r == '!' {
+			ctx.state = 3
+			continue
+		}
+
 		if ctx.state == 1 {
 			if is_iden_start(r) {
 				ctx.append_text(i - 1)
@@ -348,7 +353,7 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 				ctx.state = 2
 			} else if r == '(' {
 				ctx.append_text(i - 1)
-				ctx.start_subcmd()
+				ctx.start_subcmd('S')
 				ctx.m = i + 1
 				ctx.state = 0
 			} else {
@@ -369,13 +374,23 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 					ctx.state = 0
 				}
 			}
+		} else if ctx.state == 3 {
+			if r == '(' {
+				ctx.append_text(i - 1)
+				ctx.start_subcmd('X')
+				ctx.m = i + 1
+				ctx.state = 0
+			} else {
+				ctx.state = 0
+			}
 		}
 
 		if ctx.state == 0 && len(ctx.stack) > 0 {
 			closed := false
-			if ctx.curr.typ == 'S' && r == ')' {
+			t := ctx.curr.typ
+			if (t == 'S' || t == 'X') && r == ')' {
 				closed = true
-			} else if ctx.curr.typ == 'A' && r == ']' {
+			} else if t == 'A' && r == ']' {
 				closed = true
 			}
 			if closed {
@@ -397,25 +412,6 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 	return ctx.root
 }
 
-/*
-func get_metaexpressions(segments []Segment) [][]Segment {
-	res := make([][]Segment, 0)
-	acc := make([]Segment, 0)
-
-	for _, seg := range segments {
-		switch seg.typ {
-		case ';':
-			if len(acc) > 0 {
-				res = append(res, acc)
-				acc = make([]Segment, 0)
-			}
-		case 'R', 'S', 'D':
-			acc = append(acc, seg)
-		}
-	}
-	return res
-}
-*/
 
 func subcmd_by_segment(segments []Segment) *Token {
 	ctx := &ParseContext0{}
@@ -436,64 +432,6 @@ func subcmd_by_segment(segments []Segment) *Token {
 	return ctx.root
 }
 
-/*
-func build_ast(metas [][]Segment) *Token {
-	cmds := make([]*Token, 0, len(metas))
-	for _, meta := range metas {
-		cmds = append(cmds, subcmd_by_segment(meta))
-	}
-
-	root := &Token{typ: 'F', toks: make([]*Token, 0)}
-	curr := root
-	stack := make([]*Token, 0)
-	var pcurr *Token
-	pstack := make([]*Token, 0)
-
-	for _, cmd := range cmds {
-		if is_single_word(cmd, "end") {
-			if len(stack) == 0 {
-				panic("unexpected end")
-			}
-			curr = stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			pcurr = pstack[len(pstack)-1]
-			pstack = pstack[:len(pstack)-1]
-		} else if is_if_cmd(cmd) {
-			cond, body := parse_if(cmd)
-         block := &Token{typ: 'B', toks: make([]*Token, 0)}
-         if_tok := &Token{typ: 'K', buf: []rune{IF}, toks: []*Token{cond, block, nil}}
-         curr.toks = append(curr.toks, if_tok)
-			if body != nil {
-            block.toks = append(block.toks, body)
-			} else {
-            stack = append(stack, curr)
-            pstack = append(pstack, pcurr)
-            curr = block
-            pcurr = if_tok
-			}
-      } else if is_single_word(cmd, "else") {
-         if pcurr == nil {
-            panic("else outside if / 1")
-         }
-         if pcurr.buf[0] != IF {
-            panic("else outside if / 2")
-         }
-         block := &Token{typ: 'B', toks: make([]*Token, 0)}
-         pcurr.toks[2] = block
-         curr = block
-		} else {
-		   cmd.typ = 'C'
-		   curr.toks = append(curr.toks, cmd)
-		}
-	}
-
-	if len(stack) > 0 {
-		panic("unclosed block")
-	}
-
-	return root
-}
-*/
 
 
 
@@ -682,7 +620,8 @@ func (self *Compiler) replace(tok *Token, reserved int, add bool) {
 		t := tok.toks[i]
 		switch t.typ {
 		case 'S':
-			t.buf = []rune{rune(reserved)}
+			// t.buf = []rune{rune(reserved)}
+			t.buf[1] = rune(reserved)
 			replacement := &Token{typ: 'R'}
 			replacement.buf = []rune{rune(reserved)}
 			self.replace(t, reserved, true)
@@ -690,7 +629,6 @@ func (self *Compiler) replace(tok *Token, reserved int, add bool) {
 			tok.toks[i] = replacement
 		case 'Q':
 			self.replace(t, reserved, false)
-			// reserved++
 		}
 	}
 	if add {
