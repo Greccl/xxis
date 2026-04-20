@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	xxisCompiler "xxis/internal/compiler"
+	xxisParser "xxis/internal/parser"
 )
 
 
@@ -9,7 +11,7 @@ func main() {
    defer func() {
       if err := recover(); err != nil {
          switch x := err.(type) {
-         case CompileError:
+         case xxisCompiler.CompileError:
             fmt.Println("error detected")
             fmt.Println(x)
          }
@@ -24,14 +26,14 @@ func main() {
 	fmt.Println(src0)
 	fmt.Println()
 
-	read := enumerate_string(src0)
-	next := enumerate_tokens(read)
-	ast := build_ast_from_tokens(next)
+	read := xxisParser.enumerate_string(src0)
+	next := xxisParser.enumerate_tokens(read)
+	ast := xxisParser.build_ast_from_tokens(next)
 
 	fmt.Println("--> AST")
 	ast.dump()
 
-	com := New_Compiler()
+	com := xxisCompiler.New_Compiler()
 	for _, tok := range ast.toks {
 		com.process(tok)
 	}

@@ -1,9 +1,7 @@
-package main
+package vm
 
 import (
 	"unicode"
-	// "fmt"
-	// "os/exec"
 )
 
 
@@ -24,6 +22,11 @@ type Instr struct {
    op int
    arg int
 }
+
+type Function struct {
+	code []Instr
+}
+
 
 const (
    NOOP int = iota

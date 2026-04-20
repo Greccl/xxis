@@ -1,9 +1,14 @@
-package main
+package parser
 
+import xxisToken "xxis/internal/token"
 
-import (
-   // "fmt"
-)
+type Token xxisToken.Token
+
+type Segment struct {
+	typ    rune
+	offset int
+	buf    []rune
+}
 
 type TokenSource func() *Token
 

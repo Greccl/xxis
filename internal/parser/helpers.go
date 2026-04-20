@@ -1,4 +1,27 @@
-package main
+package parser
+
+
+
+
+
+func trim_buffer(buf []rune, left, right bool) []rune {
+	start := 0
+	end := len(buf)
+
+	if left {
+		for start < end && unicode.IsSpace(buf[start]) {
+			start++
+		}
+	}
+
+	if right {
+		for end > start && unicode.IsSpace(buf[end-1]) {
+			end--
+		}
+	}
+
+	return buf[start:end]
+}
 
 func compare_runes(a, b []rune) bool {
 	for i := 0; i < len(a) && i < len(b); i++ {
@@ -7,10 +30,6 @@ func compare_runes(a, b []rune) bool {
 		}
 	}
 	return true
-}
-
-func is_space(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
 func equal_runes_str(s []rune, word string) bool {
@@ -26,10 +45,6 @@ func equal_runes_str(s []rune, word string) bool {
 	return true
 }
 
-func strip_prefix(tok *Token, i int) {
-	tok.buf = trim_buffer(tok.buf[i:], true, false)
-}
-
 func find(s []rune, target rune, from int) int {
 	for i, r := range s {
 	   if i < from { continue }
@@ -38,6 +53,42 @@ func find(s []rune, target rune, from int) int {
 		}
 	}
 	return -1
+}
+
+
+
+
+
+func is_space(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+}
+
+func is_iden_start(r rune) bool {
+	if 'a' <= r && r <= 'z' {
+		return true
+	}
+	return 'A' <= r && r <= 'Z'
+}
+
+func is_iden_char(r rune) bool {
+	if 'a' <= r && r <= 'z' {
+		return true
+	}
+	if 'A' <= r && r <= 'Z' {
+		return true
+	}
+	if '0' <= r && r <= '9' {
+		return true
+	}
+	return r == '_'
+}
+
+
+
+
+
+func strip_prefix(tok *Token, i int) {
+	tok.buf = trim_buffer(tok.buf[i:], true, false)
 }
 
 func find_rune_in_T(toks []*Token, r rune, index, pos int) (int, int) {
@@ -100,37 +151,6 @@ func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
 
 
 
-const (
-   IF rune = iota
-   IFZ
-   IFN
-   FOR
-)
-
-var KEYWORDS = []string{
-   "if",
-   "ifz",
-   "ifn",
-   "for",
-}
-
-
-func parse_if(tok *Token) (*Token, *Token) {
-	strip_prefix(tok.toks[0], 2)
-	cond, body := split_by_colon(tok.toks)
-	if body == nil {
-		return &Token{typ: 'C', toks: cond}, nil
-	} else {
-		return &Token{typ: 'C', toks: cond}, &Token{typ: 'C', toks: body}
-	}
-}
-
-
-
-
-
-
-
 
 
 func is_single_word(tok *Token, word string) bool {
@@ -152,4 +172,14 @@ func is_if_cmd(tok *Token) bool {
 	}
 	start := []rune("if")
 	return compare_runes(start, tok.toks[0].buf)
+}
+
+func parse_if(tok *Token) (*Token, *Token) {
+	strip_prefix(tok.toks[0], 2)
+	cond, body := split_by_colon(tok.toks)
+	if body == nil {
+		return &Token{typ: 'C', toks: cond}, nil
+	} else {
+		return &Token{typ: 'C', toks: cond}, &Token{typ: 'C', toks: body}
+	}
 }

@@ -1,14 +1,28 @@
-package main
+package token
 
 import (
 	"fmt"
 )
 
+const (
+   IF rune = iota
+   IFZ
+   IFN
+   FOR
+)
+
+var KEYWORDS = []string{
+   "if",
+   "ifz",
+   "ifn",
+   "for",
+}
+
+
 type Token struct {
 	typ  rune
 	buf  []rune
 	toks []*Token
-
 }
 
 func (tok *Token) repr() string {
