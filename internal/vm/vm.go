@@ -19,12 +19,12 @@ type Context struct {
 
 
 type Instr struct {
-   op int
-   arg int
+   Op int
+   Arg int
 }
 
 type Function struct {
-	code []Instr
+	Code []Instr
 }
 
 
@@ -52,7 +52,7 @@ var OPCODES = []string{
 
 type Program struct {
 	// code []Instruction
-	funcs []Function
+	Funcs []Function
 }
 
 
@@ -72,7 +72,7 @@ func (vm *VM) run() {
 	for {
    	ins := vm.code[vm.pc]
    	// instr.Exec(vm)
-   	switch ins.op {
+   	switch ins.Op {
    	   case NOOP:
    	      continue // USELESS
    	   case HALT:

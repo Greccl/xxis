@@ -6,6 +6,8 @@ import (
 	"unicode/utf8"
 )
 
+import xxisParser "github.com/Greccl/xxis/internal/parser"
+
 type CompileError struct {
 	File     string
 	Msg      string
@@ -30,18 +32,18 @@ func compileSource(src string, filename string) (prog *Program, err *CompileErro
 		}
 	}()
 
-	read := enumerate_string(src)
+	read := xxisParser.Enumerate_string(src)
 	// segments := get_segments(read)
 	// metas := get_metaexpressions(segments)
 	// ast := build_ast(metas)
-	next := enumerate_tokens(read)
-	ast := build_ast_from_tokens(next)
+	next := xxisParser.Enumerate_tokens(read)
+	ast := xxisParser.Build_ast_from_tokens(next)
 
 	com := New_Compiler()
-	for _, tok := range ast.toks {
-		com.process(tok)
+	for _, tok := range ast.Toks {
+		com.Process(tok)
 	}
-	com.finish()
+	com.Finish()
 
 	prog = buildProgram(com)
 	return prog, nil
@@ -49,9 +51,9 @@ func compileSource(src string, filename string) (prog *Program, err *CompileErro
 
 func buildProgram(com *Compiler) *Program {
 	prog := &Program{}
-	prog.funcs = make([]Function, 0, len(com.funcs))
-	for _, f := range com.funcs {
-		prog.funcs = append(prog.funcs, *f)
+	prog.Funcs = make([]Function, 0, len(com.Funcs))
+	for _, f := range com.Funcs {
+		prog.Funcs = append(prog.Funcs, *f)
 	}
 	return prog
 }

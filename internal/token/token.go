@@ -20,38 +20,38 @@ var KEYWORDS = []string{
 
 
 type Token struct {
-	typ  rune
-	buf  []rune
-	toks []*Token
+	Typ  rune
+	Buf  []rune
+	Toks []*Token
 }
 
-func (tok *Token) repr() string {
-	switch tok.typ {
+func (tok *Token) Repr() string {
+	switch tok.Typ {
 	case 'T':
-		return fmt.Sprintf("%s", string(tok.buf))
+		return fmt.Sprintf("%s", string(tok.Buf))
 	case 'V':
-		return fmt.Sprintf("$%s", string(tok.buf))
+		return fmt.Sprintf("$%s", string(tok.Buf))
 	case 'R':
-		return fmt.Sprintf("{R%d}", tok.buf[0])
+		return fmt.Sprintf("{R%d}", tok.Buf[0])
 	case 'K':
-		name := KEYWORDS[tok.buf[0]]
-		if len(tok.toks) == 3 {
-			return fmt.Sprintf("%s {%c}:{%c}:{%c}", name, tok.toks[0].typ, tok.toks[1].typ, tok.toks[2].typ)
-		} else if len(tok.toks) == 2 {
-			return fmt.Sprintf("%s {%c}:{%c}", name, tok.toks[0].typ, tok.toks[1].typ)
-		} else if len(tok.toks) == 1 {
-			return fmt.Sprintf("%s {%c}", name, tok.toks[0].typ)
+		name := KEYWORDS[tok.Buf[0]]
+		if len(tok.Toks) == 3 {
+			return fmt.Sprintf("%s {%c}:{%c}:{%c}", name, tok.Toks[0].Typ, tok.Toks[1].Typ, tok.Toks[2].Typ)
+		} else if len(tok.Toks) == 2 {
+			return fmt.Sprintf("%s {%c}:{%c}", name, tok.Toks[0].Typ, tok.Toks[1].Typ)
+		} else if len(tok.Toks) == 1 {
+			return fmt.Sprintf("%s {%c}", name, tok.Toks[0].Typ)
 		} else {
 			return name
 		}
 	}
 	var items string
-	for _, t := range tok.toks {
-		items += t.repr()
+	for _, t := range tok.Toks {
+		items += t.Repr()
 	}
-	switch tok.typ {
+	switch tok.Typ {
 	case 'S':
-		return fmt.Sprintf("CMD R%d (%c) %s", tok.buf[1], tok.buf[0], items)
+		return fmt.Sprintf("CMD R%d (%c) %s", tok.Buf[1], tok.Buf[0], items)
 	case 'C':
 		return fmt.Sprintf("CMD -- %s", items)
 	case 'Q':
@@ -60,7 +60,7 @@ func (tok *Token) repr() string {
 	return "???"
 }
 
-func (tok *Token) dump() {
+func (tok *Token) Dump() {
 	tok.dump_node([]bool{}, false)
 }
 
@@ -82,20 +82,20 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 	}
 
    if tok != nil {
-   	fmt.Printf("%c", tok.typ)
-   	if len(tok.buf) > 0 {
-   	   switch tok.typ {
+   	fmt.Printf("%c", tok.Typ)
+   	if len(tok.Buf) > 0 {
+   	   switch tok.Typ {
    		case 'R':
-   			fmt.Printf(" REG[%d]", tok.buf[0])
+   			fmt.Printf(" REG[%d]", tok.Buf[0])
    		case 'K':
-   		   fmt.Printf(" {%s}", KEYWORDS[tok.buf[0]])
+   		   fmt.Printf(" {%s}", KEYWORDS[tok.Buf[0]])
    		case 'S':
-   			fmt.Printf(" {%c}", tok.buf[0])
-   			if tok.buf[1] >= 0 {
-   			   fmt.Printf(" -> %d", tok.buf[1])
+   			fmt.Printf(" {%c}", tok.Buf[0])
+   			if tok.Buf[1] >= 0 {
+   			   fmt.Printf(" -> %d", tok.Buf[1])
    			}
    		default:
-   			fmt.Printf(" '%s'", string(tok.buf))
+   			fmt.Printf(" '%s'", string(tok.Buf))
    	   }
    	}
 	   fmt.Println()
@@ -106,8 +106,8 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 
 	newPrefix := make([]bool, len(prefix)+1)
 	copy(newPrefix, prefix)
-	for i, child := range tok.toks {
-		last := i == len(tok.toks)-1
+	for i, child := range tok.Toks {
+		last := i == len(tok.Toks)-1
 		newPrefix[len(newPrefix)-1] = !last
 		// newPrefix[len(newPrefix)-1] = !isLast && !last
 		child.dump_node(newPrefix, last)

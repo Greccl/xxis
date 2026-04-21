@@ -1,8 +1,8 @@
 package parser
 
-import xxisToken "xxis/internal/token"
+import xxisToken "github.com/Greccl/xxis/internal/token"
 
-type Token xxisToken.Token
+type Token = xxisToken.Token
 
 type Segment struct {
 	typ    rune
@@ -12,7 +12,7 @@ type Segment struct {
 
 type TokenSource func() *Token
 
-func enumerate_tokens(read IndexedRuneSource) TokenSource {
+func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 	m := 0
 	escape := false
 	comment := false
@@ -28,7 +28,7 @@ func enumerate_tokens(read IndexedRuneSource) TokenSource {
 	expr := func(final bool) Segment {
 		exp := buf
 		if final {
-			exp = trim_buffer(exp, false, true)
+			exp = Trim_buffer(exp, false, true)
 		}
 		buf = make([]rune, 0)
 		if len(exp) > 0 {
@@ -194,8 +194,8 @@ func enumerate_tokens(read IndexedRuneSource) TokenSource {
 
 
 
-func build_ast_from_tokens(next TokenSource) *Token {
-	root := &Token{typ: 'F', toks: make([]*Token, 0)}
+func Build_ast_from_tokens(next TokenSource) *Token {
+	root := &Token{Typ: 'F', Toks: make([]*Token, 0)}
 	curr := root
 	stack := make([]*Token, 0)
 	var pcurr *Token
@@ -215,11 +215,11 @@ func build_ast_from_tokens(next TokenSource) *Token {
 			pstack = pstack[:len(pstack)-1]
 		} else if is_if_cmd(cmd) {
 			cond, body := parse_if(cmd)
-			block := &Token{typ: 'B', toks: make([]*Token, 0)}
-			if_tok := &Token{typ: 'K', buf: []rune{IF}, toks: []*Token{cond, block, nil}}
-			curr.toks = append(curr.toks, if_tok)
+			block := &Token{Typ: 'B', Toks: make([]*xxisToken.Token, 0)}
+			if_tok := &Token{Typ: 'K', Buf: []rune{xxisToken.IF}, Toks: []*Token{cond, block, nil}}
+			curr.Toks = append(curr.Toks, if_tok)
 			if body != nil {
-				block.toks = append(block.toks, body)
+				block.Toks = append(block.Toks, body)
 			} else {
 				stack = append(stack, curr)
 				pstack = append(pstack, pcurr)
@@ -230,15 +230,15 @@ func build_ast_from_tokens(next TokenSource) *Token {
 			if pcurr == nil {
 				panic("else outside if / 1")
 			}
-			if pcurr.buf[0] != IF {
+			if pcurr.Buf[0] != xxisToken.IF {
 				panic("else outside if / 2")
 			}
-			block := &Token{typ: 'B', toks: make([]*Token, 0)}
-			pcurr.toks[2] = block
+			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
+			pcurr.Toks[2] = block
 			curr = block
 		} else {
-			cmd.typ = 'C'
-			curr.toks = append(curr.toks, cmd)
+			cmd.Typ = 'C'
+			curr.Toks = append(curr.Toks, cmd)
 		}
 	}
 

@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	xxisCompiler "xxis/internal/compiler"
-	xxisParser "xxis/internal/parser"
+	xxisCompiler "github.com/Greccl/xxis/internal/compiler"
+	xxisParser "github.com/Greccl/xxis/internal/parser"
+	xxisVm "github.com/Greccl/xxis/internal/vm"
 )
 
 
@@ -26,29 +27,29 @@ func main() {
 	fmt.Println(src0)
 	fmt.Println()
 
-	read := xxisParser.enumerate_string(src0)
-	next := xxisParser.enumerate_tokens(read)
-	ast := xxisParser.build_ast_from_tokens(next)
+	read := xxisParser.Enumerate_string(src0)
+	next := xxisParser.Enumerate_tokens(read)
+	ast := xxisParser.Build_ast_from_tokens(next)
 
 	fmt.Println("--> AST")
-	ast.dump()
+	ast.Dump()
 
 	com := xxisCompiler.New_Compiler()
-	for _, tok := range ast.toks {
-		com.process(tok)
+	for _, tok := range ast.Toks {
+		com.Process(tok)
 	}
-	com.finish()
+	com.Finish()
 
    fmt.Println()
 	fmt.Println("--> value table")
-	for i, t := range com.tokens {
-	   fmt.Printf("%02d %s\n", i, t.repr())
+	for i, t := range com.Tokens {
+	   fmt.Printf("%02d %s\n", i, t.Repr())
 	}
 	fmt.Println()
 
 	fmt.Println("--> program")
-	for i, inst := range com.f.code {
-		fmt.Printf("%02d: %s %d\n", i, OPCODES[inst.op], inst.arg)
+	for i, inst := range com.Funcs["main"].Code {
+		fmt.Printf("%02d: %s %d\n", i, xxisVm.OPCODES[inst.Op], inst.Arg)
 	}
 	fmt.Println()
 }

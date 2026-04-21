@@ -1,10 +1,10 @@
 package parser
 
+import "unicode"
 
 
 
-
-func trim_buffer(buf []rune, left, right bool) []rune {
+func Trim_buffer(buf []rune, left, right bool) []rune {
 	start := 0
 	end := len(buf)
 
@@ -59,7 +59,7 @@ func find(s []rune, target rune, from int) int {
 
 
 
-func is_space(r rune) bool {
+func Is_space(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
@@ -88,23 +88,23 @@ func is_iden_char(r rune) bool {
 
 
 func strip_prefix(tok *Token, i int) {
-	tok.buf = trim_buffer(tok.buf[i:], true, false)
+	tok.Buf = Trim_buffer(tok.Buf[i:], true, false)
 }
 
 func find_rune_in_T(toks []*Token, r rune, index, pos int) (int, int) {
    if index >= len(toks) {
       return -1, 0
    }
-   if pos >= len(toks[index].buf) {
+   if pos >= len(toks[index].Buf) {
       return -1, 0
    }
    p := pos
 	for i := index; i < len(toks); i++ {
 		t := toks[i]
-		if t.typ != 'T' {
+		if t.Typ != 'T' {
 			continue
 		}
-		found := find(t.buf, r, p)
+		found := find(t.Buf, r, p)
 		if found != -1 {
 			return i, found
 		}
@@ -124,23 +124,23 @@ func split_by_colon(tokens []*Token) ([]*Token, []*Token) {
 }
 
 func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
-	text := tokens[index].buf
+	text := tokens[index].Buf
 
 	var cond []*Token
-	left := trim_buffer(text[:pos], false, true)
+	left := Trim_buffer(text[:pos], false, true)
 	if len(left) > 0 {
 		cond = make([]*Token, index+1)
-		cond[index] = &Token{typ: 'T', buf: left}
+		cond[index] = &Token{Typ: 'T', Buf: left}
 	} else {
 		cond = make([]*Token, index)
 	}
 	copy(cond, tokens[:index])
 
 	var body []*Token
-	right := trim_buffer(text[pos+1:], true, false)
+	right := Trim_buffer(text[pos+1:], true, false)
 	if len(right) > 0 {
 		body = make([]*Token, len(tokens)-index)
-		body[0] = &Token{typ: 'T', buf: right}
+		body[0] = &Token{Typ: 'T', Buf: right}
 	} else {
 		body = make([]*Token, len(tokens)-index-1)
 	}
@@ -154,32 +154,32 @@ func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
 
 
 func is_single_word(tok *Token, word string) bool {
-	if tok.typ != 'I' {
+	if tok.Typ != 'I' {
 		return false
 	}
-	if len(tok.toks) != 1 || tok.toks[0].typ != 'T' {
+	if len(tok.Toks) != 1 || tok.Toks[0].Typ != 'T' {
 		return false
 	}
-	return equal_runes_str(trim_buffer(tok.toks[0].buf, true, true), word)
+	return equal_runes_str(Trim_buffer(tok.Toks[0].Buf, true, true), word)
 }
 
 func is_if_cmd(tok *Token) bool {
-	if tok.typ != 'I' {
+	if tok.Typ != 'I' {
    	return false
 	}
-	if len(tok.toks) == 0 || tok.toks[0].typ != 'T' {
+	if len(tok.Toks) == 0 || tok.Toks[0].Typ != 'T' {
 		return false
 	}
 	start := []rune("if")
-	return compare_runes(start, tok.toks[0].buf)
+	return compare_runes(start, tok.Toks[0].Buf)
 }
 
 func parse_if(tok *Token) (*Token, *Token) {
-	strip_prefix(tok.toks[0], 2)
-	cond, body := split_by_colon(tok.toks)
+	strip_prefix(tok.Toks[0], 2)
+	cond, body := split_by_colon(tok.Toks)
 	if body == nil {
-		return &Token{typ: 'C', toks: cond}, nil
+		return &Token{Typ: 'C', Toks: cond}, nil
 	} else {
-		return &Token{typ: 'C', toks: cond}, &Token{typ: 'C', toks: body}
+		return &Token{Typ: 'C', Toks: cond}, &Token{Typ: 'C', Toks: body}
 	}
 }

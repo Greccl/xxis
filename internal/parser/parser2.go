@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"unicode"
+	// "unicode"
 	"unicode/utf8"
 )
 
@@ -17,7 +17,7 @@ func check(e error) {
 
 type IndexedRuneSource func() (int, rune, bool)
 
-func enumerate_file(path string) IndexedRuneSource {
+func Enumerate_file(path string) IndexedRuneSource {
 	file, err := os.Open(path)
 	check(err)
 
@@ -36,7 +36,7 @@ func enumerate_file(path string) IndexedRuneSource {
 	}
 }
 
-func enumerate_string(str string) IndexedRuneSource {
+func Enumerate_string(str string) IndexedRuneSource {
 	var i int
 	return func() (int, rune, bool) {
 		if i >= len(str) {
@@ -49,7 +49,7 @@ func enumerate_string(str string) IndexedRuneSource {
 	}
 }
 
-func enumerate_runes(rns []rune) IndexedRuneSource {
+func Enumerate_runes(rns []rune) IndexedRuneSource {
 	var i int
 	return func() (int, rune, bool) {
 		if i >= len(rns) {
@@ -79,8 +79,8 @@ type ParseContext0 struct {
 
 func (self *ParseContext0) init() {
 	self.root = &Token{}
-	self.root.typ = 'I'
-	self.root.toks = make([]*Token, 0)
+	self.root.Typ = 'I'
+	self.root.Toks = make([]*Token, 0)
 	self.curr = self.root
 	self.stack = make([]*Token, 0)
 }
@@ -92,11 +92,11 @@ func (self *ParseContext0) new_segment(text []rune) {
 }
 
 func (self *ParseContext0) append_runes(typ rune, buf []rune) {
-	self.curr.toks = append(self.curr.toks, &Token{typ, buf, nil})
+	self.curr.Toks = append(self.curr.Toks, &Token{typ, buf, nil})
 }
 
 func (self *ParseContext0) append_token(tok *Token) {
-	self.curr.toks = append(self.curr.toks, tok)
+	self.curr.Toks = append(self.curr.Toks, tok)
 }
 
 func (self *ParseContext0) append_text(i int) {
@@ -135,7 +135,7 @@ func (self *ParseContext0) pop() {
 
 
 func subcmd_by_text(ctx *ParseContext0) *Token {
-	read := enumerate_runes(ctx.text)
+	read := Enumerate_runes(ctx.text)
 	for {
 		i, r, eof := read()
 
@@ -212,7 +212,7 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 
 		if ctx.state == 0 && len(ctx.stack) > 0 {
 			closed := false
-			t := ctx.curr.typ
+			t := ctx.curr.Typ
 			if (t == 'S' || t == 'X') && r == ')' {
 				closed = true
 			} else if t == 'A' && r == ']' {
@@ -220,7 +220,7 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 			}
 			if closed {
 				ctx.append_text(i)
-				if len(ctx.curr.toks) == 0 {
+				if len(ctx.curr.Toks) == 0 {
 					ctx.append_runes('_', nil)
 				}
 				ctx.pop()
@@ -246,7 +246,7 @@ func subcmd_by_segment(segments []Segment) *Token {
 			subctx.init()
 			subctx.new_segment(seg.buf)
 			s := subcmd_by_text(subctx)
-			s.typ = 'Q'
+			s.Typ = 'Q'
 			ctx.append_token(s)
 		} else {
 			ctx.new_segment(seg.buf)
