@@ -1,5 +1,7 @@
+n- ENV1 =  123
+- ENV2   =abc def
 cmd 1
-if $(cmd 2) "hola mundo"
+if cmd2
    cmd '3' $(hola)$(mundo)
    if cmd 4   :   exit
    last in block
