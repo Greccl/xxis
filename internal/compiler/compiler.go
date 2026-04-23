@@ -2,7 +2,7 @@ package compiler
 
 import xxisVm "github.com/Greccl/xxis/internal/vm"
 import xxisToken "github.com/Greccl/xxis/internal/token"
-import xxisParser "github.com/Greccl/xxis/internal/parser"
+// import xxisParser "github.com/Greccl/xxis/internal/parser"
 
 type Function = xxisVm.Function
 type Program = xxisVm.Program
@@ -47,6 +47,7 @@ func (self *Compiler) Finish() {
 	self.push(xxisVm.HALT, 0)
 }
 
+/*
 func (self *Compiler) splitAndOr(tok *Token) *Token {
 	if tok.Typ != 'C' {
 		return tok
@@ -142,10 +143,16 @@ func (self *Compiler) splitAndOr(tok *Token) *Token {
 	}
 	return block
 }
+*/
 
 func (self *Compiler) Process(tok *Token) {
 	switch tok.Typ {
+		case 'B':
+			for _, t := range tok.Toks {
+				self.Process(t)
+			}
 	   case 'C':
+         /*
 	      split := self.splitAndOr(tok)
 	      if split.Typ == 'B' {
 	      	for _, t := range split.Toks {
@@ -155,6 +162,8 @@ func (self *Compiler) Process(tok *Token) {
 	         // fmt.Printf("try to teplace %s\n", split.repr())
    		   self.replace(split, 0, true)
 	      }
+	      */
+			self.replace(tok, 0, true)
 		case 'K':
 		   switch tok.Buf[0] {
 		      case xxisToken.IF:

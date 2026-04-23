@@ -178,8 +178,108 @@ func parse_if(tok *Token) (*Token, *Token) {
 	strip_prefix(tok.Toks[0], 2)
 	cond, body := split_by_colon(tok.Toks)
 	if body == nil {
-		return &Token{Typ: 'C', Toks: cond}, nil
+		// return &Token{Typ: 'C', Toks: cond}, nil
+		return split_and_or(&Token{Typ: 'C', Toks: cond}), nil
 	} else {
-		return &Token{Typ: 'C', Toks: cond}, &Token{Typ: 'C', Toks: body}
+		// return &Token{Typ: 'C', Toks: cond}, &Token{Typ: 'C', Toks: body}
+		return split_and_or(&Token{Typ: 'C', Toks: cond}), split_and_or(&Token{Typ: 'C', Toks: body})
 	}
+}
+
+func split_and_or(tok *Token) *Token {
+	if tok == nil || tok.Typ != 'C' {
+		return tok
+	}
+
+	findOp := func(buf []rune, from int) (int, rune) {
+		for i := from; i < len(buf)-1; i++ {
+			if buf[i] == '&' && buf[i+1] == '&' {
+				return i, '&'
+			}
+			if buf[i] == '|' && buf[i+1] == '|' {
+				return i, '|'
+			}
+		}
+		return -1, 0
+	}
+
+	parts := make([]*Token, 0, 2)
+	ops := make([]rune, 0, 1)
+	curr := make([]*Token, 0)
+	stripLeft := false
+	found := false
+
+	for _, t := range tok.Toks {
+		if t.Typ != 'T' {
+			if stripLeft {
+				stripLeft = false
+			}
+			curr = append(curr, t)
+			continue
+		}
+
+		buf := t.Buf
+		if stripLeft {
+			buf = Trim_buffer(buf, true, false)
+			stripLeft = false
+		}
+
+		pos := 0
+		for {
+			opPos, op := findOp(buf, pos)
+			if opPos == -1 {
+				if pos == 0 {
+					if len(buf) > 0 {
+						curr = append(curr, &Token{Typ: 'T', Buf: buf})
+					}
+				} else if pos < len(buf) {
+					frag := buf[pos:]
+					if len(frag) > 0 {
+						curr = append(curr, &Token{Typ: 'T', Buf: frag})
+					}
+				}
+				break
+			}
+
+			found = true
+			left := Trim_buffer(buf[pos:opPos], false, true)
+			if len(left) > 0 {
+				curr = append(curr, &Token{Typ: 'T', Buf: left})
+			}
+
+			if len(curr) > 0 {
+				parts = append(parts, &Token{Typ: 'C', Toks: curr})
+				ops = append(ops, op)
+			}
+			curr = make([]*Token, 0)
+
+			pos = opPos + 2
+			for pos < len(buf) && Is_space(buf[pos]) {
+				pos++
+			}
+			if pos >= len(buf) {
+				stripLeft = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		return tok
+	}
+	if len(curr) > 0 {
+		parts = append(parts, &Token{Typ: 'C', Toks: curr})
+	}
+	if len(parts) == 0 || len(ops) == 0 || len(parts) != len(ops)+1 {
+		return tok
+	}
+
+	block := &Token{Typ: 'B', Toks: make([]*Token, len(parts))}
+	for i, part := range parts {
+		if i > 0 {
+			part.Typ = ops[i-1]
+		}
+		block.Toks[i] = part
+	}
+	return block
 }

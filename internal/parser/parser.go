@@ -238,7 +238,8 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 			curr = block
 		} else {
 			cmd.Typ = 'C'
-			curr.Toks = append(curr.Toks, cmd)
+			// curr.Toks = append(curr.Toks, cmd)
+			curr.Toks = append(curr.Toks, split_and_or(cmd))
 		}
 	}
 
