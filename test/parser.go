@@ -11,11 +11,20 @@ import (
 
 
 func main() {
-	fmt.Println("-- TEST PARSER --")
 
 	// home, _ := os.UserHomeDir()
 	// path := filepath.Join(home, "dev", "xxis", "test1.txt")
-	read := xxisParser.Enumerate_file("test/src0.txt")
+	read, _ := xxisParser.Enumerate_file("test/src0.txt")
+
+   defer func() {
+      if err := recover(); err != nil {
+         switch x := err.(type) {
+         case xxisParser.ParseError:
+            fmt.Println("error detected")
+            fmt.Println(x)
+         }
+      }
+   }()
 
 	// src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)!(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
 	// read := xxisParser.Enumerate_string(src0)

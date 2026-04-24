@@ -1,7 +1,7 @@
 package parser
 
 import "unicode"
-
+import "fmt"
 
 
 func Trim_buffer(buf []rune, left, right bool) []rune {
@@ -282,4 +282,16 @@ func split_and_or(tok *Token) *Token {
 		block.Toks[i] = part
 	}
 	return block
+}
+
+
+
+type ParseError struct {
+	Msg      string
+	Start int
+	End   int
+}
+
+func (e *ParseError) Error() string {
+	return fmt.Sprintf("ParseError: %s", e.Msg)
 }

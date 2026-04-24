@@ -20,9 +20,11 @@ var KEYWORDS = []string{
 
 
 type Token struct {
-	Typ  rune
-	Buf  []rune
-	Toks []*Token
+	Typ   rune
+	Start int
+	End   int
+	Buf   []rune
+	Toks  []*Token
 }
 
 func (tok *Token) Repr() string {

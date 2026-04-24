@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	// "unicode"
 	"unicode/utf8"
 )
 
@@ -16,14 +15,17 @@ func check(e error) {
 }
 
 type IndexedRuneSource func() (int, rune, bool)
+type LineInfoResolver func(int) int
 
-func Enumerate_file(path string) IndexedRuneSource {
+func Enumerate_file(path string) (IndexedRuneSource, LineInfoResolver) {
 	file, err := os.Open(path)
 	check(err)
 
+   var lines = []int{0}
 	var i int = -1
 	reader := bufio.NewReader(file)
-	return func() (int, rune, bool) {
+
+	read := func() (int, rune, bool) {
 		r, _, err := reader.ReadRune()
 		if err != nil {
 			if err == io.EOF {
@@ -32,8 +34,22 @@ func Enumerate_file(path string) IndexedRuneSource {
 			panic(fmt.Errorf("error reading rune: %w", err))
 		}
 		i++
+		if r == '\n' {
+		   lines = append(lines, i)
+		}
 		return i, r, false
 	}
+
+	resolver := func(offset int) int {
+	   for i, start := range lines {
+	      if offset < start {
+	         return i
+	      }
+	   }
+	   return 1
+	}
+
+	return read, resolver
 }
 
 func Enumerate_string(str string) IndexedRuneSource {
@@ -247,6 +263,8 @@ func subcmd_by_segment(segments []Segment) *Token {
 			subctx.new_segment(seg.buf)
 			s := subcmd_by_text(subctx)
 			s.Typ = 'Q'
+			s.Start = seg.offset
+			s.End = seg.offset + len(seg.buf)
 			ctx.append_token(s)
 		} else {
 			ctx.new_segment(seg.buf)
