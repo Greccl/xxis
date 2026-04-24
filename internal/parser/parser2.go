@@ -88,9 +88,11 @@ type ParseContext0 struct {
 
 	text   []rune
 	m      int
+	base   int
 	escape bool
 	state  int
 	quote  rune
+	strip  bool
 }
 
 func (self *ParseContext0) init() {
@@ -101,14 +103,15 @@ func (self *ParseContext0) init() {
 	self.stack = make([]*Token, 0)
 }
 
-func (self *ParseContext0) new_segment(text []rune) {
-	self.text = text
+func (self *ParseContext0) new_segment(seg Segment) {
+	self.text = seg.buf
 	self.m = 0
+	self.base = seg.offset
 	self.escape = false
 }
 
-func (self *ParseContext0) append_runes(typ rune, buf []rune) {
-	self.curr.Toks = append(self.curr.Toks, &Token{typ, buf, nil})
+func (self *ParseContext0) append_runes(typ rune, buf []rune, s, e int) {
+	self.curr.Toks = append(self.curr.Toks, &Token{Typ:typ, Start:s, End:e, Buf:buf, Toks:nil})
 }
 
 func (self *ParseContext0) append_token(tok *Token) {
@@ -117,14 +120,15 @@ func (self *ParseContext0) append_token(tok *Token) {
 
 func (self *ParseContext0) append_text(i int) {
 	if i-self.m > 0 {
-		self.append_runes('T', self.text[self.m:i])
+		self.append_runes('T', self.text[self.m:i], self.base+self.m, self.base+i)
 	}
 }
 
-func (self *ParseContext0) start_subcmd(t rune) {
-	sub := &Token{'S', []rune{t, -1}, make([]*Token, 0)}
+func (self *ParseContext0) start_subcmd(t rune, s int) {
+	sub := &Token{Typ:'S', Buf:[]rune{t, -1}, Toks:make([]*Token, 0), Start:s}
 	self.append_token(sub)
 	self.push(sub)
+	self.strip = true
 }
 
 /*
@@ -165,6 +169,15 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 			continue
 		}
 
+      if ctx.strip {
+      	switch r {
+      	case ' ', '\t':
+      		if !eof { continue }
+      	}
+      	ctx.strip = false
+      	ctx.m = i
+      }
+
 		if ctx.quote == 0 {
 			if r == '\'' || r == '"' {
 				ctx.quote = r
@@ -194,7 +207,7 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 				ctx.state = 2
 			} else if r == '(' {
 				ctx.append_text(i - 1)
-				ctx.start_subcmd('S')
+				ctx.start_subcmd('S', ctx.base+i-1)
 				ctx.m = i + 1
 				ctx.state = 0
 			} else {
@@ -206,7 +219,7 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 					// ctx.push_access(i)
 					ctx.m = i + 1
 				} else {
-					ctx.append_runes('V', ctx.text[ctx.m:i])
+					ctx.append_runes('V', ctx.text[ctx.m:i], ctx.base+ctx.m-1, ctx.base+i)
 					ctx.m = i
 				}
 				if r == '$' {
@@ -218,7 +231,7 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 		} else if ctx.state == 3 {
 			if r == '(' {
 				ctx.append_text(i - 1)
-				ctx.start_subcmd('X')
+				ctx.start_subcmd('X', ctx.base+i-1)
 				ctx.m = i + 1
 				ctx.state = 0
 			} else {
@@ -237,7 +250,9 @@ func subcmd_by_text(ctx *ParseContext0) *Token {
 			if closed {
 				ctx.append_text(i)
 				if len(ctx.curr.Toks) == 0 {
-					ctx.append_runes('_', nil)
+					ctx.append_runes('_', nil, 0, 0)
+				} else {
+				   ctx.curr.End = ctx.base + i + 1
 				}
 				ctx.pop()
 				ctx.m = i + 1
@@ -260,16 +275,20 @@ func subcmd_by_segment(segments []Segment) *Token {
 		if seg.typ == 'Q' {
 			subctx := &ParseContext0{}
 			subctx.init()
-			subctx.new_segment(seg.buf)
+			subctx.new_segment(seg)
 			s := subcmd_by_text(subctx)
 			s.Typ = 'Q'
-			s.Start = seg.offset
-			s.End = seg.offset + len(seg.buf)
+			s.Start = seg.offset - 1
+			s.End = seg.offset + len(seg.buf) + 1
 			ctx.append_token(s)
 		} else {
-			ctx.new_segment(seg.buf)
+			ctx.new_segment(seg)
 			subcmd_by_text(ctx)
 		}
 	}
+	ctx.root.Start = segments[0].offset
+	last := segments[len(segments) - 1]
+	ctx.root.End = last.offset + len(last.buf)
+	ctx.root.Dump()
 	return ctx.root
 }

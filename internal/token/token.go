@@ -100,6 +100,7 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
    			fmt.Printf(" '%s'", string(tok.Buf))
    	   }
    	}
+   	fmt.Printf("  %d:%d", tok.Start, tok.End)
 	   fmt.Println()
 	} else {
 	   fmt.Printf("@NIL\n")

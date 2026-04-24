@@ -1,8 +1,8 @@
-n- ENV1 =  123
+n- ENV1 =  $var $( subcmd 'hola')
 - ENV2   =abc def
-cmd 1
+cmd 1 $var_name
 if cmd2
-   cmd '3' $(hola)$(mundo)
+   cmd '3' $(  hola)!(mundo)
    if cmd 4   :   exit
    last in block
 else

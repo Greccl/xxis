@@ -72,6 +72,7 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 					if !eof { continue }
 				}
 				strip = false
+				m = i
 			}
 
 			if comment {
