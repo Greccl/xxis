@@ -62,6 +62,31 @@ func (tok *Token) Repr() string {
 	return "???"
 }
 
+func (tok *Token) Name() string {
+	a := fmt.Sprintf("%c ", tok.Typ)
+	var b string
+	if len(tok.Buf) > 0 {
+	   switch tok.Typ {
+		case 'R':
+			b = fmt.Sprintf("REG[%d]", tok.Buf[0])
+		case 'K':
+		   b = fmt.Sprintf("{%s}", KEYWORDS[tok.Buf[0]])
+		case 'S':
+			b = fmt.Sprintf("{%c}", tok.Buf[0])
+			if tok.Buf[1] >= 0 {
+			   b = fmt.Sprintf("%s -> %d", b, tok.Buf[1])
+			}
+		default:
+			b = fmt.Sprintf("'%s'", string(tok.Buf))
+	   }
+	}
+	c := fmt.Sprintf(" - %d:%d", tok.Start, tok.End)
+	return a + b + c
+}
+
+
+
+
 func (tok *Token) Dump() {
 	tok.dump_node([]bool{}, false)
 }
@@ -84,24 +109,7 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 	}
 
    if tok != nil {
-   	fmt.Printf("%c", tok.Typ)
-   	if len(tok.Buf) > 0 {
-   	   switch tok.Typ {
-   		case 'R':
-   			fmt.Printf(" REG[%d]", tok.Buf[0])
-   		case 'K':
-   		   fmt.Printf(" {%s}", KEYWORDS[tok.Buf[0]])
-   		case 'S':
-   			fmt.Printf(" {%c}", tok.Buf[0])
-   			if tok.Buf[1] >= 0 {
-   			   fmt.Printf(" -> %d", tok.Buf[1])
-   			}
-   		default:
-   			fmt.Printf(" '%s'", string(tok.Buf))
-   	   }
-   	}
-   	fmt.Printf("  %d:%d", tok.Start, tok.End)
-	   fmt.Println()
+      fmt.Println(tok.Name())
 	} else {
 	   fmt.Printf("@NIL\n")
 	   return
@@ -112,7 +120,50 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 	for i, child := range tok.Toks {
 		last := i == len(tok.Toks)-1
 		newPrefix[len(newPrefix)-1] = !last
-		// newPrefix[len(newPrefix)-1] = !isLast && !last
 		child.dump_node(newPrefix, last)
+	}
+}
+
+
+
+func (tok *Token) BuildNodes(printer func(*Token,string,string)) {
+	tok.build_node([]bool{}, false, printer)
+}
+
+func (tok *Token) build_node(prefix []bool, isLast bool, printer func(*Token,string,string)) {
+   var p, n string
+
+	for i, hasNext := range prefix {
+		if i == len(prefix)-1 {
+			if isLast {
+				p += fmt.Sprint("└── ")
+			} else {
+				p += fmt.Sprint("├── ")
+			}
+		} else {
+			if hasNext {
+				p += fmt.Sprint("│   ")
+			} else {
+				p += fmt.Sprint("    ")
+			}
+		}
+	}
+
+   if tok != nil {
+      n = tok.Name()
+   	printer(tok, p, n)
+	} else {
+	   n = "@NIL"
+   	printer(tok, p, n)
+   	return
+	}
+
+
+	newPrefix := make([]bool, len(prefix)+1)
+	copy(newPrefix, prefix)
+	for i, child := range tok.Toks {
+		last := i == len(tok.Toks)-1
+		newPrefix[len(newPrefix)-1] = !last
+		child.build_node(newPrefix, last, printer)
 	}
 }

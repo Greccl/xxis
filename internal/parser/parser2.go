@@ -289,6 +289,6 @@ func subcmd_by_segment(segments []Segment) *Token {
 	ctx.root.Start = segments[0].offset
 	last := segments[len(segments) - 1]
 	ctx.root.End = last.offset + len(last.buf)
-	ctx.root.Dump()
+	// ctx.root.Dump()
 	return ctx.root
 }
