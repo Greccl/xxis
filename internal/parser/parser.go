@@ -210,17 +210,25 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 			if len(stack) == 0 {
 				panic("unexpected end")
 			}
+			pcurr.End = cmd.End
+			inheritRangeFromChildren(curr)
 			curr = stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			pcurr = pstack[len(pstack)-1]
 			pstack = pstack[:len(pstack)-1]
 		} else if is_if_cmd(cmd) {
 			cond, body := parse_if(cmd)
-			block := &Token{Typ: 'B', Toks: make([]*xxisToken.Token, 0)}
+         inheritRangeFromChildren(cond)
+			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
+         inheritRangeFromChildren(block)
 			if_tok := &Token{Typ: 'K', Buf: []rune{xxisToken.IF}, Toks: []*Token{cond, block, nil}}
 			curr.Toks = append(curr.Toks, if_tok)
+			if_tok.Start = cmd.Start
 			if body != nil {
 				block.Toks = append(block.Toks, body)
+				block.Start = body.Start
+				block.End = body.End
+				if_tok.End = cmd.End
 			} else {
 				stack = append(stack, curr)
 				pstack = append(pstack, pcurr)
@@ -234,6 +242,7 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 			if pcurr.Buf[0] != xxisToken.IF {
 				panic("else outside if / 2")
 			}
+			inheritRangeFromChildren(curr)
 			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
 			pcurr.Toks[2] = block
 			curr = block

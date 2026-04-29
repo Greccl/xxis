@@ -89,6 +89,7 @@ func is_iden_char(r rune) bool {
 
 func strip_prefix(tok *Token, i int) {
 	tok.Buf = Trim_buffer(tok.Buf[i:], true, false)
+	tok.Start += i + 1
 }
 
 func find_rune_in_T(toks []*Token, r rune, index, pos int) (int, int) {
@@ -177,12 +178,24 @@ func is_if_cmd(tok *Token) bool {
 func parse_if(tok *Token) (*Token, *Token) {
 	strip_prefix(tok.Toks[0], 2)
 	cond, body := split_by_colon(tok.Toks)
+   // inheritRangeFromChildren(cond)
+   // inheritRangeFromChildren(body)
 	if body == nil {
-		// return &Token{Typ: 'C', Toks: cond}, nil
-		return split_and_or(&Token{Typ: 'C', Toks: cond}), nil
+		c := split_and_or(&Token{Typ: 'C', Toks: cond})
+		// c.Start = cond[0].Start
+		// c.End = cond[len(cond)-1].End
+		inheritRangeFromChildren(c)
+		return c, nil
 	} else {
-		// return &Token{Typ: 'C', Toks: cond}, &Token{Typ: 'C', Toks: body}
-		return split_and_or(&Token{Typ: 'C', Toks: cond}), split_and_or(&Token{Typ: 'C', Toks: body})
+		c := split_and_or(&Token{Typ: 'C', Toks: cond})
+		inheritRangeFromChildren(c)
+		// c.Start = cond[0].Start
+		// c.End = cond[len(cond)-1].End
+		b := split_and_or(&Token{Typ: 'C', Toks: body})
+		inheritRangeFromChildren(b)
+		// b.Start = body[0].Start
+		// b.End = body[len(body)-1].End
+		return c, b
 	}
 }
 
@@ -281,9 +294,17 @@ func split_and_or(tok *Token) *Token {
 		}
 		block.Toks[i] = part
 	}
+   inheritRangeFromChildren(block)
 	return block
 }
 
+func inheritRangeFromChildren(tok *Token) {
+   if len(tok.Toks) == 0 { return }
+   first := tok.Toks[0]
+   last := tok.Toks[len(tok.Toks)-1]
+   if first != nil { tok.Start = first.Start }
+   if last != nil { tok.End = last.End }
+}
 
 
 type ParseError struct {
