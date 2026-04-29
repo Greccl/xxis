@@ -210,7 +210,7 @@ func split_and_or(tok *Token) *Token {
 				return i, '&'
 			}
 			if buf[i] == '|' && buf[i+1] == '|' {
-				return i, '|'
+				return i, '/'
 			}
 		}
 		return -1, 0
@@ -288,13 +288,14 @@ func split_and_or(tok *Token) *Token {
 	}
 
 	block := &Token{Typ: 'B', Toks: make([]*Token, len(parts))}
+   block.Start = tok.Start
+   block.End = tok.End
 	for i, part := range parts {
 		if i > 0 {
 			part.Typ = ops[i-1]
 		}
 		block.Toks[i] = part
 	}
-   inheritRangeFromChildren(block)
 	return block
 }
 
