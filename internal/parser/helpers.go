@@ -3,7 +3,6 @@ package parser
 import "unicode"
 import "fmt"
 
-
 func Trim_buffer(buf []rune, left, right bool) []rune {
 	start := 0
 	end := len(buf)
@@ -23,6 +22,25 @@ func Trim_buffer(buf []rune, left, right bool) []rune {
 	return buf[start:end]
 }
 
+func trimBufferRange(buf []rune, start int, left, right bool) ([]rune, int) {
+	from := 0
+	to := len(buf)
+
+	if left {
+		for from < to && unicode.IsSpace(buf[from]) {
+			from++
+		}
+	}
+
+	if right {
+		for to > from && unicode.IsSpace(buf[to-1]) {
+			to--
+		}
+	}
+
+	return buf[from:to], start + from
+}
+
 func compare_runes(a, b []rune) bool {
 	for i := 0; i < len(a) && i < len(b); i++ {
 		if a[i] != b[i] {
@@ -33,7 +51,7 @@ func compare_runes(a, b []rune) bool {
 }
 
 func equal_runes_str(s []rune, word string) bool {
-   w := []rune(word)
+	w := []rune(word)
 	if len(s) != len(w) {
 		return false
 	}
@@ -47,17 +65,15 @@ func equal_runes_str(s []rune, word string) bool {
 
 func find(s []rune, target rune, from int) int {
 	for i, r := range s {
-	   if i < from { continue }
+		if i < from {
+			continue
+		}
 		if r == target {
 			return i
 		}
 	}
 	return -1
 }
-
-
-
-
 
 func Is_space(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
@@ -83,23 +99,19 @@ func is_iden_char(r rune) bool {
 	return r == '_'
 }
 
-
-
-
-
 func strip_prefix(tok *Token, i int) {
 	tok.Buf = Trim_buffer(tok.Buf[i:], true, false)
 	tok.Start += i + 1
 }
 
 func find_rune_in_T(toks []*Token, r rune, index, pos int) (int, int) {
-   if index >= len(toks) {
-      return -1, 0
-   }
-   if pos >= len(toks[index].Buf) {
-      return -1, 0
-   }
-   p := pos
+	if index >= len(toks) {
+		return -1, 0
+	}
+	if pos >= len(toks[index].Buf) {
+		return -1, 0
+	}
+	p := pos
 	for i := index; i < len(toks); i++ {
 		t := toks[i]
 		if t.Typ != 'T' {
@@ -121,38 +133,36 @@ func split_by_colon(tokens []*Token) ([]*Token, []*Token) {
 		return tokens, nil
 	}
 
-   return split_tokens_at(tokens, index, pos)
+	return split_tokens_at(tokens, index, pos)
 }
 
 func split_tokens_at(tokens []*Token, index, pos int) ([]*Token, []*Token) {
 	text := tokens[index].Buf
+	textStart := tokens[index].Start
 
 	var cond []*Token
-	left := Trim_buffer(text[:pos], false, true)
+	left, leftStart := trimBufferRange(text[:pos], textStart, false, true)
 	if len(left) > 0 {
 		cond = make([]*Token, index+1)
-		cond[index] = &Token{Typ: 'T', Buf: left}
+		cond[index] = &Token{Typ: 'T', Buf: left, Start: leftStart, End: leftStart + len(left)}
 	} else {
 		cond = make([]*Token, index)
 	}
 	copy(cond, tokens[:index])
 
 	var body []*Token
-	right := Trim_buffer(text[pos+1:], true, false)
+	right, rightStart := trimBufferRange(text[pos+1:], textStart+pos+1, true, false)
 	if len(right) > 0 {
 		body = make([]*Token, len(tokens)-index)
-		body[0] = &Token{Typ: 'T', Buf: right}
+		body[0] = &Token{Typ: 'T', Buf: right, Start: rightStart, End: rightStart + len(right)}
+		copy(body[1:], tokens[index+1:])
 	} else {
 		body = make([]*Token, len(tokens)-index-1)
+		copy(body, tokens[index+1:])
 	}
-	copy(body[1:], tokens[index+1:])
 
 	return cond, body
 }
-
-
-
-
 
 func is_single_word(tok *Token, word string) bool {
 	if tok.Typ != 'I' {
@@ -166,7 +176,7 @@ func is_single_word(tok *Token, word string) bool {
 
 func is_if_cmd(tok *Token) bool {
 	if tok.Typ != 'I' {
-   	return false
+		return false
 	}
 	if len(tok.Toks) == 0 || tok.Toks[0].Typ != 'T' {
 		return false
@@ -178,23 +188,13 @@ func is_if_cmd(tok *Token) bool {
 func parse_if(tok *Token) (*Token, *Token) {
 	strip_prefix(tok.Toks[0], 2)
 	cond, body := split_by_colon(tok.Toks)
-   // inheritRangeFromChildren(cond)
-   // inheritRangeFromChildren(body)
 	if body == nil {
 		c := split_and_or(&Token{Typ: 'C', Toks: cond})
-		// c.Start = cond[0].Start
-		// c.End = cond[len(cond)-1].End
-		inheritRangeFromChildren(c)
 		return c, nil
 	} else {
 		c := split_and_or(&Token{Typ: 'C', Toks: cond})
-		inheritRangeFromChildren(c)
-		// c.Start = cond[0].Start
-		// c.End = cond[len(cond)-1].End
 		b := split_and_or(&Token{Typ: 'C', Toks: body})
 		inheritRangeFromChildren(b)
-		// b.Start = body[0].Start
-		// b.End = body[len(body)-1].End
 		return c, b
 	}
 }
@@ -222,6 +222,25 @@ func split_and_or(tok *Token) *Token {
 	stripLeft := false
 	found := false
 
+	appendText := func(dst []*Token, buf []rune, start int) []*Token {
+		if len(buf) == 0 {
+			return dst
+		}
+		return append(dst, &Token{
+			Typ:   'T',
+			Buf:   buf,
+			Start: start,
+			End:   start + len(buf),
+		})
+	}
+
+	appendPart := func(part []*Token, op rune) {
+		c := &Token{Typ: 'C', Toks: part}
+		inheritRangeFromChildren(c)
+		parts = append(parts, c)
+		ops = append(ops, op)
+	}
+
 	for _, t := range tok.Toks {
 		if t.Typ != 'T' {
 			if stripLeft {
@@ -232,8 +251,9 @@ func split_and_or(tok *Token) *Token {
 		}
 
 		buf := t.Buf
+		bufStart := t.Start
 		if stripLeft {
-			buf = Trim_buffer(buf, true, false)
+			buf, bufStart = trimBufferRange(buf, bufStart, true, false)
 			stripLeft = false
 		}
 
@@ -242,27 +262,20 @@ func split_and_or(tok *Token) *Token {
 			opPos, op := findOp(buf, pos)
 			if opPos == -1 {
 				if pos == 0 {
-					if len(buf) > 0 {
-						curr = append(curr, &Token{Typ: 'T', Buf: buf})
-					}
+					curr = appendText(curr, buf, bufStart)
 				} else if pos < len(buf) {
 					frag := buf[pos:]
-					if len(frag) > 0 {
-						curr = append(curr, &Token{Typ: 'T', Buf: frag})
-					}
+					curr = appendText(curr, frag, bufStart+pos)
 				}
 				break
 			}
 
 			found = true
-			left := Trim_buffer(buf[pos:opPos], false, true)
-			if len(left) > 0 {
-				curr = append(curr, &Token{Typ: 'T', Buf: left})
-			}
+			left, leftStart := trimBufferRange(buf[pos:opPos], bufStart+pos, false, true)
+			curr = appendText(curr, left, leftStart)
 
 			if len(curr) > 0 {
-				parts = append(parts, &Token{Typ: 'C', Toks: curr})
-				ops = append(ops, op)
+				appendPart(curr, op)
 			}
 			curr = make([]*Token, 0)
 
@@ -281,35 +294,41 @@ func split_and_or(tok *Token) *Token {
 		return tok
 	}
 	if len(curr) > 0 {
-		parts = append(parts, &Token{Typ: 'C', Toks: curr})
+		part := &Token{Typ: 'C', Toks: curr}
+		inheritRangeFromChildren(part)
+		parts = append(parts, part)
 	}
 	if len(parts) == 0 || len(ops) == 0 || len(parts) != len(ops)+1 {
 		return tok
 	}
 
 	block := &Token{Typ: 'B', Toks: make([]*Token, len(parts))}
-   block.Start = tok.Start
-   block.End = tok.End
 	for i, part := range parts {
 		if i > 0 {
 			part.Typ = ops[i-1]
 		}
 		block.Toks[i] = part
 	}
+	inheritRangeFromChildren(block)
 	return block
 }
 
 func inheritRangeFromChildren(tok *Token) {
-   if len(tok.Toks) == 0 { return }
-   first := tok.Toks[0]
-   last := tok.Toks[len(tok.Toks)-1]
-   if first != nil { tok.Start = first.Start }
-   if last != nil { tok.End = last.End }
+	if len(tok.Toks) == 0 {
+		return
+	}
+	first := tok.Toks[0]
+	last := tok.Toks[len(tok.Toks)-1]
+	if first != nil {
+		tok.Start = first.Start
+	}
+	if last != nil {
+		tok.End = last.End
+	}
 }
 
-
 type ParseError struct {
-	Msg      string
+	Msg   string
 	Start int
 	End   int
 }
