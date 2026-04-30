@@ -205,7 +205,6 @@ func main() {
 	next := xxisParser.Enumerate_tokens(read)
 	ast := xxisParser.Build_ast_from_tokens(next)
 
-	// ast.Dump()
 	view := New_AstView(ast)
 
 	s, err := tcell.NewScreen()
@@ -352,6 +351,18 @@ func main() {
 					inode = next
 					drawAll()
 				}
+			case tcell.KeyPgUp:
+			   inode--
+			   if inode < 0 {
+			      inode = 0
+			   }
+			   drawAll()
+			case tcell.KeyPgDn:
+			   inode++
+			   if inode >= len(view) {
+			      inode = len(view) - 1
+			   }
+			   drawAll()
 			}
 		}
 	}
