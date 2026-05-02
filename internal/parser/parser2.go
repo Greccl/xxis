@@ -43,10 +43,10 @@ func Enumerate_file(path string) (IndexedRuneSource, LineInfoResolver) {
 	resolver := func(offset int) int {
 	   for i, start := range lines {
 	      if offset < start {
-	         return i
+	         return i - 1
 	      }
 	   }
-	   return 1
+	   return len(lines) - 1
 	}
 
 	return read, resolver

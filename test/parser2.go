@@ -285,8 +285,8 @@ func main() {
 		if selEnd <= selStart {
 			selEnd = selStart + 1
 		}
-		l1 := getLine(selStart) - 1
-		l2 := getLine(selEnd-1) - 1
+		l1 := getLine(selStart)
+		l2 := getLine(selEnd-1)
 		r := l2 - l1 + 1
 		l0 := 0
 		if len(lines) <= boxh {
@@ -306,8 +306,8 @@ func main() {
 			l := l0 + i
 			if l < len(sourceLines) {
 				s.PutStr(0, i, fmt.Sprintf("%d", l+1))
-				s.PutStr(2, i, "| ")
-				drawHighlightedLine(s, 4, i, sourceLines[l], selStart, selEnd, defStyle, textStyle)
+				s.PutStr(3, i, "| ")
+				drawHighlightedLine(s, 5, i, sourceLines[l], selStart, selEnd, defStyle, textStyle)
 			}
 		}
 

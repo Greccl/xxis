@@ -9,3 +9,6 @@ else
    it works
 end
 cmd 5 && cmd '6 $var6' || cmd 7
+function foo
+   echo hello from foo
+end
