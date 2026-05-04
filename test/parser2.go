@@ -282,7 +282,7 @@ func main() {
 		}
 		selStart := tok.Start
 		selEnd := tok.End
-		if selEnd <= selStart {
+		if selEnd < selStart {
 			selEnd = selStart + 1
 		}
 		l1 := getLine(selStart)

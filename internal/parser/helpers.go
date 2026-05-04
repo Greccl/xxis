@@ -100,8 +100,13 @@ func is_iden_char(r rune) bool {
 }
 
 func strip_prefix(tok *Token, i int) {
-	tok.Buf = Trim_buffer(tok.Buf[i:], true, false)
-	tok.Start += i + 1
+	if i > len(tok.Buf) {
+		i = len(tok.Buf)
+	}
+	buf, start := trimBufferRange(tok.Buf[i:], tok.Start+i, true, false)
+	tok.Buf = buf
+	tok.Start = start
+	tok.End = start + len(buf)
 }
 
 func find_rune_in_T(toks []*Token, r rune, index, pos int) (int, int) {
@@ -175,14 +180,32 @@ func is_single_word(tok *Token, word string) bool {
 }
 
 func is_if_cmd(tok *Token) bool {
+	return is_keyword_cmd(tok, "if")
+}
+
+func is_function_cmd(tok *Token) bool {
+	return is_keyword_cmd(tok, "function")
+}
+
+func is_keyword_cmd(tok *Token, word string) bool {
 	if tok.Typ != 'I' {
 		return false
 	}
 	if len(tok.Toks) == 0 || tok.Toks[0].Typ != 'T' {
 		return false
 	}
-	start := []rune("if")
-	return compare_runes(start, tok.Toks[0].Buf)
+	buf := tok.Toks[0].Buf
+	prefix := []rune(word)
+	if len(buf) < len(prefix) {
+		return false
+	}
+	if !compare_runes(prefix, buf) {
+		return false
+	}
+	if len(buf) == len(prefix) {
+		return true
+	}
+	return Is_space(buf[len(prefix)])
 }
 
 func parse_if(tok *Token) (*Token, *Token) {
@@ -197,6 +220,23 @@ func parse_if(tok *Token) (*Token, *Token) {
 		inheritRangeFromChildren(b)
 		return c, b
 	}
+}
+
+func parse_function(tok *Token) *Token {
+	strip_prefix(tok.Toks[0], 8)
+
+	params := tok.Toks
+	if len(params) > 0 && params[0].Typ == 'T' && len(params[0].Buf) == 0 {
+		params = params[1:]
+	}
+
+	node := &Token{Typ: 'C', Toks: params}
+	inheritRangeFromChildren(node)
+	if len(node.Toks) == 0 {
+		node.Start = tok.End
+		node.End = tok.End
+	}
+	return node
 }
 
 func split_and_or(tok *Token) *Token {

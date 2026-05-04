@@ -196,8 +196,13 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 
 
 func Build_ast_from_tokens(next TokenSource) *Token {
-	root := &Token{Typ: 'F', Toks: make([]*Token, 0)}
-	curr := root
+	root := &Token{Typ: 'P', Toks: make([]*Token, 0)}
+	mainParams := &Token{Typ: 'T'}
+	mainBlock := &Token{Typ: 'B', Toks: make([]*Token, 0)}
+	main := &Token{Typ: 'F', Toks: []*Token{mainParams, mainBlock}}
+	root.Toks = append(root.Toks, main)
+
+	curr := mainBlock
 	stack := make([]*Token, 0)
 	var pcurr *Token
 	pstack := make([]*Token, 0)
@@ -235,8 +240,18 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 				curr = block
 				pcurr = if_tok
 			}
+		} else if is_function_cmd(cmd) {
+			params := parse_function(cmd)
+			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
+			fn := &Token{Typ: 'F', Start: cmd.Start, Toks: []*Token{params, block}}
+			root.Toks = append(root.Toks, fn)
+
+			stack = append(stack, curr)
+			pstack = append(pstack, pcurr)
+			curr = block
+			pcurr = fn
 		} else if is_single_word(cmd, "else") {
-			if pcurr == nil {
+			if pcurr == nil || pcurr.Typ != 'K' || len(pcurr.Buf) == 0 {
 				panic("else outside if / 1")
 			}
 			if pcurr.Buf[0] != xxisToken.IF {
@@ -255,6 +270,11 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 	if len(stack) > 0 {
 		panic("unclosed block")
 	}
+
+	inheritRangeFromChildren(mainBlock)
+	main.Start = mainBlock.Start
+	main.End = mainBlock.End
+	inheritRangeFromChildren(root)
 
 	return root
 }

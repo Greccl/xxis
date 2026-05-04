@@ -70,3 +70,57 @@ func TestSplitTokensAtPreservesRangesForSplitAndOr(t *testing.T) {
 		t.Fatalf("body second part range = %d:%d, want 28:36", bodyTok.Toks[1].Start, bodyTok.Toks[1].End)
 	}
 }
+
+func TestBuildAstWrapsMainAndUserFunctions(t *testing.T) {
+	src := "cmd main\nfunction foo arg1 arg2\ncmd foo\nif cond\nnested\nend\nend\ncmd after\nfunction bar\nend"
+	next := Enumerate_tokens(Enumerate_string(src))
+
+	got := Build_ast_from_tokens(next)
+	if got.Typ != 'P' {
+		t.Fatalf("root Typ = %q, want 'P'", got.Typ)
+	}
+	if len(got.Toks) != 3 {
+		t.Fatalf("root child count = %d, want 3", len(got.Toks))
+	}
+
+	main := got.Toks[0]
+	if main.Typ != 'F' || len(main.Toks) != 2 {
+		t.Fatalf("main node = %q with %d children, want F with 2 children", main.Typ, len(main.Toks))
+	}
+	mainBlock := main.Toks[1]
+	if mainBlock.Typ != 'B' || len(mainBlock.Toks) != 2 {
+		t.Fatalf("main block = %q with %d children, want B with 2 commands", mainBlock.Typ, len(mainBlock.Toks))
+	}
+	if string(mainBlock.Toks[0].Toks[0].Buf) != "cmd main" {
+		t.Fatalf("main first command = %q, want %q", string(mainBlock.Toks[0].Toks[0].Buf), "cmd main")
+	}
+	if string(mainBlock.Toks[1].Toks[0].Buf) != "cmd after" {
+		t.Fatalf("main second command = %q, want %q", string(mainBlock.Toks[1].Toks[0].Buf), "cmd after")
+	}
+
+	foo := got.Toks[1]
+	if foo.Typ != 'F' || len(foo.Toks) != 2 {
+		t.Fatalf("foo node = %q with %d children, want F with 2 children", foo.Typ, len(foo.Toks))
+	}
+	if string(foo.Toks[0].Toks[0].Buf) != "foo arg1 arg2" {
+		t.Fatalf("foo params = %q, want %q", string(foo.Toks[0].Toks[0].Buf), "foo arg1 arg2")
+	}
+	fooBlock := foo.Toks[1]
+	if fooBlock.Typ != 'B' || len(fooBlock.Toks) != 2 {
+		t.Fatalf("foo block = %q with %d children, want B with 2 commands", fooBlock.Typ, len(fooBlock.Toks))
+	}
+	if fooBlock.Toks[1].Typ != 'K' {
+		t.Fatalf("foo nested node Typ = %q, want 'K'", fooBlock.Toks[1].Typ)
+	}
+
+	bar := got.Toks[2]
+	if bar.Typ != 'F' || len(bar.Toks) != 2 {
+		t.Fatalf("bar node = %q with %d children, want F with 2 children", bar.Typ, len(bar.Toks))
+	}
+	if string(bar.Toks[0].Toks[0].Buf) != "bar" {
+		t.Fatalf("bar params = %q, want %q", string(bar.Toks[0].Toks[0].Buf), "bar")
+	}
+	if bar.Toks[1].Typ != 'B' || len(bar.Toks[1].Toks) != 0 {
+		t.Fatalf("bar block = %q with %d children, want empty B", bar.Toks[1].Typ, len(bar.Toks[1].Toks))
+	}
+}
