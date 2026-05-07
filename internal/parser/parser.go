@@ -213,7 +213,13 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 
 		if is_single_word(cmd, "end") {
 			if len(stack) == 0 {
-				panic("unexpected end")
+				panic(
+				   ParseError{
+				      Msg: "Unexpected end",
+				      Start: cmd.Start,
+				      End: cmd.End,
+				   },
+				)
 			}
 			pcurr.End = cmd.End
 			inheritRangeFromChildren(curr)
@@ -229,6 +235,13 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 			if_tok := &Token{Typ: 'K', Buf: []rune{xxisToken.IF}, Toks: []*Token{cond, block, nil}}
 			curr.Toks = append(curr.Toks, if_tok)
 			if_tok.Start = cmd.Start
+			panic(
+			   ParseError{
+			      Msg: "Ejemplo de error",
+			      Start: cmd.Toks[1].Start,
+			      End: cmd.Toks[1].End,
+			   },
+			)
 			if body != nil {
 				block.Toks = append(block.Toks, body)
 				block.Start = body.Start

@@ -20,7 +20,7 @@ func main() {
       if err := recover(); err != nil {
          switch x := err.(type) {
          case xxisParser.ParseError:
-            fmt.Println("error detected")
+            fmt.Println(x.Msg)
             fmt.Println(x)
          }
       }

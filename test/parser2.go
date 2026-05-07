@@ -161,13 +161,43 @@ func drawHighlightedLine(s tcell.Screen, x, y int, line SourceLine, selStart, se
 	s.PutStrStyled(x+b, y, string(runes[b:]), defStyle)
 }
 
+func drawSourceLine(line SourceLine, index, selStart, selEnd int) {
+   l := selEnd - selStart
+
+   if l == 0 {
+      fmt.Print("\033[38;2;235m")
+   }
+
+   fmt.Printf("%3d| ", index)   
+	if l == 0 {
+		fmt.Printf("%s\033[0m\n", line.text)
+		return
+	}
+
+	runes := []rune(line.text)
+	a := clamp(selStart-line.start, 0, len(runes))
+	b := clamp(selEnd-line.start, 0, len(runes))
+
+	if a >= b {
+		fmt.Printf("%s\n", line.text)
+		return
+	}
+
+   fmt.Print("\033[38;2;255m")
+	fmt.Printf("%s", string(runes[:a]))
+	fmt.Printf("\033[31m%s\033[0m", string(runes[a:b]))
+	fmt.Printf("%s\n", string(runes[b:]))
+}
+
+
 func main() {
+	path := "test/src0.txt"
 
 	// home, _ := os.UserHomeDir()
 	// path := filepath.Join(home, "dev", "xxis", "test1.txt")
-	read, getLine := xxisParser.Enumerate_file("test/src0.txt")
+	read, getLine := xxisParser.Enumerate_file(path)
 
-	file, err := os.Open("test/src0.txt")
+	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -187,17 +217,28 @@ func main() {
 	sourceLines := buildSourceLines(lines)
 	file.Close()
 
-	/*
-	   defer func() {
-	      if err := recover(); err != nil {
-	         switch x := err.(type) {
-	         case xxisParser.ParseError:
-	            fmt.Println("error detected")
-	            fmt.Println(x)
-	         }
-	      }
-	   }()
-	*/
+   defer func() {
+      if err := recover(); err != nil {
+         switch x := err.(type) {
+         case xxisParser.ParseError:
+            num := getLine(x.Start)
+            fmt.Printf("%s, line %d: %s\n", path, num+1, x.Msg)
+            n0 := num - 2
+            if n0 < 0 { n0 = 0 }
+            for i:=0; i<5; i++ {
+               n := n0 + i
+               if n == num {
+                  drawSourceLine(sourceLines[n], n, x.Start, x.End)
+               } else {
+                  drawSourceLine(sourceLines[n], n, 0, 0)
+               }
+            }
+         default:
+            panic(err)
+         }
+         os.Exit(1)
+      }
+   }()
 
 	// src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)!(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
 	// read := xxisParser.Enumerate_string(src0)

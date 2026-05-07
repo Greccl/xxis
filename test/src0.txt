@@ -1,7 +1,7 @@
 n- ENV1 =  $var $( subcmd 'hola')
 - ENV2   =abc def
 cmd 1 $var_name
-if cmd2
+if cmd2 == $var + 1
    cmd '3' $(  hola)!(mundo)
    if cmd 4   :   exit
    last in block
@@ -9,6 +9,7 @@ else
    it works
 end
 cmd 5 && cmd '6 $var6' || cmd 7
+    end
 function foo
    echo hello from foo
 end
