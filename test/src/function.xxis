@@ -1,0 +1,4 @@
+cmd begin test
+function foo
+	cmd 1
+cmd end test

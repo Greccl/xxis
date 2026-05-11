@@ -72,7 +72,7 @@ func TestSplitTokensAtPreservesRangesForSplitAndOr(t *testing.T) {
 }
 
 func TestBuildAstWrapsMainAndUserFunctions(t *testing.T) {
-	src := "cmd main\nfunction foo arg1 arg2\ncmd foo\nif cond\nnested\nend\nend\ncmd after\nfunction bar\nend"
+	src := "cmd main\nfunction foo arg1 arg2\n\tcmd foo\n\tif cond\n\t\tnested\ncmd after\nfunction bar\n\tcmd bar"
 	next := Enumerate_tokens(Enumerate_string(src))
 
 	got := Build_ast_from_tokens(next)
@@ -120,7 +120,66 @@ func TestBuildAstWrapsMainAndUserFunctions(t *testing.T) {
 	if string(bar.Toks[0].Toks[0].Buf) != "bar" {
 		t.Fatalf("bar params = %q, want %q", string(bar.Toks[0].Toks[0].Buf), "bar")
 	}
-	if bar.Toks[1].Typ != 'B' || len(bar.Toks[1].Toks) != 0 {
-		t.Fatalf("bar block = %q with %d children, want empty B", bar.Toks[1].Typ, len(bar.Toks[1].Toks))
+	if bar.Toks[1].Typ != 'B' || len(bar.Toks[1].Toks) != 1 {
+		t.Fatalf("bar block = %q with %d children, want B with 1 command", bar.Toks[1].Typ, len(bar.Toks[1].Toks))
+	}
+}
+
+func TestBuildAstUsesTabsForIndentedIfElse(t *testing.T) {
+	src := "if cond\n\tthen cmd\nelse\n\telse cmd\nafter"
+	next := Enumerate_tokens(Enumerate_string(src))
+
+	got := Build_ast_from_tokens(next)
+	mainBlock := got.Toks[0].Toks[1]
+	if len(mainBlock.Toks) != 2 {
+		t.Fatalf("main block child count = %d, want 2", len(mainBlock.Toks))
+	}
+	if mainBlock.Toks[0].Typ != 'K' {
+		t.Fatalf("first node Typ = %q, want if keyword", mainBlock.Toks[0].Typ)
+	}
+	ifNode := mainBlock.Toks[0]
+	if ifNode.Toks[2] == nil {
+		t.Fatalf("if else block is nil")
+	}
+	if len(ifNode.Toks[1].Toks) != 1 {
+		t.Fatalf("then block child count = %d, want 1", len(ifNode.Toks[1].Toks))
+	}
+	if len(ifNode.Toks[2].Toks) != 1 {
+		t.Fatalf("else block child count = %d, want 1", len(ifNode.Toks[2].Toks))
+	}
+	if string(mainBlock.Toks[1].Toks[0].Buf) != "after" {
+		t.Fatalf("second main command = %q, want after", string(mainBlock.Toks[1].Toks[0].Buf))
+	}
+}
+
+func TestBuildAstRejectsSpaceIndentation(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fatalf("Build_ast_from_tokens did not panic")
+		}
+		pe, ok := err.(ParseError)
+		if !ok {
+			t.Fatalf("panic = %T, want ParseError", err)
+		}
+		if pe.Msg != "indentation must use tabs" {
+			t.Fatalf("ParseError.Msg = %q, want indentation must use tabs", pe.Msg)
+		}
+	}()
+
+	next := Enumerate_tokens(Enumerate_string("if cond\n  cmd"))
+	Build_ast_from_tokens(next)
+}
+
+func TestBuildAstTreatsEndAsCommand(t *testing.T) {
+	next := Enumerate_tokens(Enumerate_string("end"))
+
+	got := Build_ast_from_tokens(next)
+	mainBlock := got.Toks[0].Toks[1]
+	if len(mainBlock.Toks) != 1 {
+		t.Fatalf("main block child count = %d, want 1", len(mainBlock.Toks))
+	}
+	if string(mainBlock.Toks[0].Toks[0].Buf) != "end" {
+		t.Fatalf("command = %q, want end", string(mainBlock.Toks[0].Toks[0].Buf))
 	}
 }

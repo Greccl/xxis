@@ -191,7 +191,7 @@ func drawSourceLine(line SourceLine, index, selStart, selEnd int) {
 
 
 func main() {
-	path := "test/src0.txt"
+	path := "test/src/function.xxis"
 
 	// home, _ := os.UserHomeDir()
 	// path := filepath.Join(home, "dev", "xxis", "test1.txt")

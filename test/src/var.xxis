@@ -1,0 +1,10 @@
+var a = hola
+var -g b = hola
+var :num c = hola
+var -u :list d = hola
+
+var a = hola
+var a < mundo
+var a > mundo
+var a --delete
+var a --exists

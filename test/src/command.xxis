@@ -1,0 +1,7 @@
+cmd begin test
+cmd 1 $(cmd 'hola')
+cmd 2 $var_name
+cmd '3' $(  hola)!(mundo)
+cmd 4$concat'tokens'
+cmd 5 && cmd '6 $var6' || cmd 7
+cmd end test

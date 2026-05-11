@@ -4,6 +4,11 @@ import xxisToken "github.com/Greccl/xxis/internal/token"
 
 type Token = xxisToken.Token
 
+const (
+	tokenIndent rune = '>'
+	tokenDedent rune = '<'
+)
+
 type Segment struct {
 	typ    rune
 	offset int
@@ -21,9 +26,13 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 	var quote rune = 0
 	strip := true
 
-	meta := make([]Segment, 0)
-	var pending *Token
+	instr := make([]Segment, 0)
+	queue := make([]*Token, 0)
 	done := false
+	lineStart := true
+	lineIndent := 0
+	lineIndentHasSpaces := false
+	indentStack := []int{0}
 
 	expr := func(final bool) Segment {
 		exp := buf
@@ -37,39 +46,131 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 		return Segment{}
 	}
 
-	emit := func(seg Segment) bool {
+	enqueue := func(tok *Token) {
+		queue = append(queue, tok)
+	}
+
+	popQueue := func() *Token {
+		tok := queue[0]
+		queue = queue[1:]
+		return tok
+	}
+
+	emit := func(seg Segment) {
 		switch seg.typ {
 		case 'R', 'Q':
-			meta = append(meta, seg)
+			instr = append(instr, seg)
 		case ';':
 			strip = true
-			if len(meta) > 0 {
-				pending = subcmd_by_segment(meta)
-				meta = make([]Segment, 0)
-				return true
+			if len(instr) > 0 {
+				enqueue(subcmd_by_segment(instr))
+				instr = make([]Segment, 0)
 			}
 		}
-		return false
+	}
+
+	emitIndentEvents := func(indent, offset int) {
+		curr := indentStack[len(indentStack)-1]
+		if indent > curr {
+			indentStack = append(indentStack, indent)
+			enqueue(&Token{Typ: tokenIndent, Start: offset, End: offset})
+			return
+		}
+		for indent < curr {
+			if len(indentStack) == 1 {
+				panic(ParseError{
+					Msg:   "unmatched dedent",
+					Start: offset,
+					End:   offset,
+				})
+			}
+			indentStack = indentStack[:len(indentStack)-1]
+			enqueue(&Token{Typ: tokenDedent, Start: offset, End: offset})
+			curr = indentStack[len(indentStack)-1]
+		}
+		if indent != curr {
+			panic(ParseError{
+				Msg:   "unmatched dedent",
+				Start: offset,
+				End:   offset,
+			})
+		}
+	}
+
+	emitFinalDedents := func(offset int) {
+		for len(indentStack) > 1 {
+			indentStack = indentStack[:len(indentStack)-1]
+			enqueue(&Token{Typ: tokenDedent, Start: offset, End: offset})
+		}
 	}
 
 	yield := func() *Token {
-      pending = nil
+		if len(queue) > 0 {
+			return popQueue()
+		}
 
-		if done { return nil }
+		if done {
+			return nil
+		}
 
 		for {
 			i, r, eof := read()
 
+			if lineStart && quote == 0 && !comment {
+				if eof {
+					emitFinalDedents(i)
+					done = true
+					if len(queue) > 0 {
+						return popQueue()
+					}
+					return nil
+				}
+				switch r {
+				case '\t':
+					lineIndent++
+					continue
+				case ' ':
+					lineIndentHasSpaces = true
+					continue
+				case '\n':
+					lineIndent = 0
+					lineIndentHasSpaces = false
+					strip = true
+					continue
+				case '#':
+					lineStart = false
+					comment = true
+					typ = 'C'
+					m = i + 1
+					continue
+				}
+				if lineIndentHasSpaces {
+					panic(ParseError{
+						Msg:   "indentation must use tabs",
+						Start: i,
+						End:   i + 1,
+					})
+				}
+				emitIndentEvents(lineIndent, i)
+				lineStart = false
+				strip = false
+				m = i
+			}
+
 			if escape {
 				escape = false
 				buf = append(buf, r)
-				if !eof { continue }
+				if !eof {
+					continue
+				}
 			}
 
 			if strip {
 				switch r {
 				case ' ', '\t':
-					if !eof { continue }
+					if !eof {
+						continue
+					}
 				}
 				strip = false
 				m = i
@@ -77,13 +178,13 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 
 			if comment {
 				if r == '\n' || eof {
-					e := expr(false)
+					buf = buf[:0]
 					strip = true
-					if e.typ != 0 {
-						if emit(e) {
-							return pending
-						}
-					}
+					comment = false
+					typ = 'R'
+					lineStart = true
+					lineIndent = 0
+					lineIndentHasSpaces = false
 				} else {
 					buf = append(buf, r)
 				}
@@ -91,9 +192,10 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 					if quote != 0 {
 						panic("unclosed quote")
 					}
+					emitFinalDedents(i)
 					done = true
-					if pending != nil {
-						return pending
+					if len(queue) > 0 {
+						return popQueue()
 					}
 					return nil
 				}
@@ -103,12 +205,8 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 			if quote == 0 && r == '#' {
 				e := expr(true)
 				if e.typ != 0 {
-					if emit(e) {
-						return pending
-					}
-					if emit(Segment{';', i, nil}) {
-						return pending
-					}
+					emit(e)
+					emit(Segment{';', i, nil})
 				}
 				strip = true
 				comment = true
@@ -121,9 +219,7 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 				if quote == 0 {
 					e := expr(false)
 					if e.typ != 0 {
-						if emit(e) {
-							return pending
-						}
+						emit(e)
 					}
 					m = i + 1
 					typ = 'Q'
@@ -132,9 +228,7 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 					if quote == r {
 						e := expr(false)
 						if e.typ != 0 {
-							if emit(e) {
-								return pending
-							}
+							emit(e)
 						}
 						typ = 'R'
 						quote = 0
@@ -147,9 +241,10 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 					if quote != 0 {
 						panic("unclosed quote")
 					}
+					emitFinalDedents(i)
 					done = true
-					if pending != nil {
-						return pending
+					if len(queue) > 0 {
+						return popQueue()
 					}
 					return nil
 				}
@@ -159,14 +254,15 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 			if r == '\n' || r == ';' || eof {
 				e := expr(true)
 				if e.typ != 0 {
-					if emit(e) {
-						return pending
-					}
+					emit(e)
 				}
-				if emit(Segment{';', i, nil}) {
-					return pending
-				}
+				emit(Segment{';', i, nil})
 				strip = true
+				if r == '\n' {
+					lineStart = true
+					lineIndent = 0
+					lineIndentHasSpaces = false
+				}
 			} else {
 				if r == '\\' && !escape {
 					escape = true
@@ -179,21 +275,21 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 				if quote != 0 {
 					panic("unclosed quote")
 				}
+				emitFinalDedents(i)
 				done = true
-				if pending != nil {
-					return pending
+				if len(queue) > 0 {
+					return popQueue()
 				}
 				return nil
+			}
+			if len(queue) > 0 {
+				return popQueue()
 			}
 		}
 	}
 
 	return yield
 }
-
-
-
-
 
 func Build_ast_from_tokens(next TokenSource) *Token {
 	root := &Token{Typ: 'P', Toks: make([]*Token, 0)}
@@ -206,80 +302,130 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 	stack := make([]*Token, 0)
 	var pcurr *Token
 	pstack := make([]*Token, 0)
+	var pendingBlock *Token
+	var pendingParent *Token
+	var elseCandidate *Token
+
+	openPendingBlock := func() {
+		stack = append(stack, curr)
+		pstack = append(pstack, pcurr)
+		curr = pendingBlock
+		pcurr = pendingParent
+		pendingBlock = nil
+		pendingParent = nil
+		elseCandidate = nil
+	}
+
+	closeBlock := func(tok *Token) {
+		if len(stack) == 0 {
+			panic(ParseError{
+				Msg:   "unexpected dedent",
+				Start: tok.Start,
+				End:   tok.End,
+			})
+		}
+		closingParent := pcurr
+		inheritRangeFromChildren(curr)
+		if closingParent != nil {
+			closingParent.End = curr.End
+		}
+		curr = stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		pcurr = pstack[len(pstack)-1]
+		pstack = pstack[:len(pstack)-1]
+		if closingParent != nil && closingParent.Typ == 'K' && len(closingParent.Buf) > 0 && closingParent.Buf[0] == xxisToken.IF && closingParent.Toks[2] == nil {
+			elseCandidate = closingParent
+		} else {
+			elseCandidate = nil
+		}
+	}
 
 	for {
 		cmd := next()
-		if cmd == nil { break }
+		if cmd == nil {
+			break
+		}
 
-		if is_single_word(cmd, "end") {
-			if len(stack) == 0 {
-				panic(
-				   ParseError{
-				      Msg: "Unexpected end",
-				      Start: cmd.Start,
-				      End: cmd.End,
-				   },
-				)
+		if cmd.Typ == tokenIndent {
+			if pendingBlock == nil {
+				panic(ParseError{
+					Msg:   "unexpected indent",
+					Start: cmd.Start,
+					End:   cmd.End,
+				})
 			}
-			pcurr.End = cmd.End
-			inheritRangeFromChildren(curr)
-			curr = stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			pcurr = pstack[len(pstack)-1]
-			pstack = pstack[:len(pstack)-1]
-		} else if is_if_cmd(cmd) {
+			openPendingBlock()
+			continue
+		}
+		if cmd.Typ == tokenDedent {
+			if pendingBlock != nil {
+				panic(ParseError{
+					Msg:   "expected indented block",
+					Start: cmd.Start,
+					End:   cmd.End,
+				})
+			}
+			closeBlock(cmd)
+			continue
+		}
+		if pendingBlock != nil {
+			panic(ParseError{
+				Msg:   "expected indented block",
+				Start: cmd.Start,
+				End:   cmd.End,
+			})
+		}
+
+		if is_if_cmd(cmd) {
+			elseCandidate = nil
 			cond, body := parse_if(cmd)
-         inheritRangeFromChildren(cond)
+			inheritRangeFromChildren(cond)
 			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
-         inheritRangeFromChildren(block)
+			inheritRangeFromChildren(block)
 			if_tok := &Token{Typ: 'K', Buf: []rune{xxisToken.IF}, Toks: []*Token{cond, block, nil}}
 			curr.Toks = append(curr.Toks, if_tok)
 			if_tok.Start = cmd.Start
-			panic(
-			   ParseError{
-			      Msg: "Ejemplo de error",
-			      Start: cmd.Toks[1].Start,
-			      End: cmd.Toks[1].End,
-			   },
-			)
 			if body != nil {
 				block.Toks = append(block.Toks, body)
 				block.Start = body.Start
 				block.End = body.End
 				if_tok.End = cmd.End
 			} else {
-				stack = append(stack, curr)
-				pstack = append(pstack, pcurr)
-				curr = block
-				pcurr = if_tok
+				pendingBlock = block
+				pendingParent = if_tok
 			}
 		} else if is_function_cmd(cmd) {
+			elseCandidate = nil
 			params := parse_function(cmd)
 			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
 			fn := &Token{Typ: 'F', Start: cmd.Start, Toks: []*Token{params, block}}
 			root.Toks = append(root.Toks, fn)
 
-			stack = append(stack, curr)
-			pstack = append(pstack, pcurr)
-			curr = block
-			pcurr = fn
+			pendingBlock = block
+			pendingParent = fn
 		} else if is_single_word(cmd, "else") {
-			if pcurr == nil || pcurr.Typ != 'K' || len(pcurr.Buf) == 0 {
-				panic("else outside if / 1")
+			if elseCandidate == nil {
+				panic(ParseError{
+					Msg:   "else outside if",
+					Start: cmd.Start,
+					End:   cmd.End,
+				})
 			}
-			if pcurr.Buf[0] != xxisToken.IF {
-				panic("else outside if / 2")
-			}
-			inheritRangeFromChildren(curr)
 			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
-			pcurr.Toks[2] = block
-			curr = block
+			elseCandidate.Toks[2] = block
+			pendingBlock = block
+			pendingParent = elseCandidate
+			elseCandidate = nil
 		} else {
+			elseCandidate = nil
 			cmd.Typ = 'C'
 			curr.Toks = append(curr.Toks, split_and_or(cmd))
 		}
 	}
 
+	if pendingBlock != nil {
+		panic("expected indented block")
+	}
 	if len(stack) > 0 {
 		panic("unclosed block")
 	}
