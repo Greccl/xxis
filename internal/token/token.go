@@ -9,6 +9,7 @@ const (
    IFZ
    IFN
    FOR
+   VAR
 )
 
 var KEYWORDS = []string{
@@ -16,8 +17,68 @@ var KEYWORDS = []string{
    "ifz",
    "ifn",
    "for",
+   "var",
 }
 
+const (
+	VarScopeLocal     rune = 'l'
+	VarScopeGlobal    rune = 'g'
+	VarScopeUniversal rune = 'u'
+	VarTypeString     rune = 's'
+	VarTypeFloat      rune = 'n'
+	VarTypeProcess    rune = 'j'
+	VarTypePath       rune = 'p'
+	VarTypeList       rune = 'l'
+	VarTypeDict       rune = 'd'
+	VarOpAssign       rune = '='
+	VarOpAppend       rune = '<'
+	VarOpPrepend      rune = '>'
+	VarOpDelete       rune = 'd'
+)
+
+func VarScopeName(scope rune) string {
+	switch scope {
+	case VarScopeLocal:
+		return "local"
+	case VarScopeGlobal:
+		return "global"
+	case VarScopeUniversal:
+		return "universal"
+	}
+	return "unknown"
+}
+
+func VarTypeName(kind rune) string {
+	switch kind {
+	case VarTypeString:
+		return "string"
+	case VarTypeFloat:
+		return "float"
+	case VarTypeProcess:
+		return "process"
+	case VarTypePath:
+		return "path"
+	case VarTypeList:
+		return "list"
+	case VarTypeDict:
+		return "dict"
+	}
+	return "unknown"
+}
+
+func VarOpName(op rune) string {
+	switch op {
+	case VarOpAssign:
+		return "assign"
+	case VarOpAppend:
+		return "append"
+	case VarOpPrepend:
+		return "prepend"
+	case VarOpDelete:
+		return "delete"
+	}
+	return "unknown"
+}
 
 type Token struct {
 	Typ   rune
@@ -37,6 +98,11 @@ func (tok *Token) Repr() string {
 		return fmt.Sprintf("{R%d}", tok.Buf[0])
 	case 'K':
 		name := KEYWORDS[tok.Buf[0]]
+		if tok.Buf[0] == VAR && len(tok.Buf) >= 4 {
+			argTyp := '-'
+			if len(tok.Toks) > 1 && tok.Toks[1] != nil { argTyp = tok.Toks[1].Typ }
+			return fmt.Sprintf("%s scope=%s type=%s op=%s {%c}:{%c}", name, VarScopeName(tok.Buf[1]), VarTypeName(tok.Buf[2]), VarOpName(tok.Buf[3]), tok.Toks[0].Typ, argTyp)
+		}
 		if len(tok.Toks) == 3 {
 			return fmt.Sprintf("%s {%c}:{%c}:{%c}", name, tok.Toks[0].Typ, tok.Toks[1].Typ, tok.Toks[2].Typ)
 		} else if len(tok.Toks) == 2 {
@@ -70,7 +136,11 @@ func (tok *Token) Name() string {
 		case 'R':
 			b = fmt.Sprintf("REG[%d]", tok.Buf[0])
 		case 'K':
-		   b = fmt.Sprintf("{%s}", KEYWORDS[tok.Buf[0]])
+			if tok.Buf[0] == VAR && len(tok.Buf) >= 4 {
+				b = fmt.Sprintf("{var} %s %s %s", VarScopeName(tok.Buf[1]), VarTypeName(tok.Buf[2]), VarOpName(tok.Buf[3]))
+			} else {
+				b = fmt.Sprintf("{%s}", KEYWORDS[tok.Buf[0]])
+			}
 		case 'S':
 			b = fmt.Sprintf("{%c}", tok.Buf[0])
 			if tok.Buf[1] >= 0 {

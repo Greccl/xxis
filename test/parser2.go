@@ -162,13 +162,18 @@ func drawHighlightedLine(s tcell.Screen, x, y int, line SourceLine, selStart, se
 }
 
 func drawSourceLine(line SourceLine, index, selStart, selEnd int) {
+   if selEnd == -1 {
+      fmt.Printf("\033[38;2;235m   |\033[0m\n")
+      return
+   }
+
    l := selEnd - selStart
 
    if l == 0 {
       fmt.Print("\033[38;2;235m")
    }
 
-   fmt.Printf("%3d| ", index)   
+   fmt.Printf("%3d| ", index+1)
 	if l == 0 {
 		fmt.Printf("%s\033[0m\n", line.text)
 		return
@@ -191,7 +196,7 @@ func drawSourceLine(line SourceLine, index, selStart, selEnd int) {
 
 
 func main() {
-	path := "test/src/function.xxis"
+	path := "test/src/var.xxis"
 
 	// home, _ := os.UserHomeDir()
 	// path := filepath.Join(home, "dev", "xxis", "test1.txt")
@@ -229,8 +234,10 @@ func main() {
                n := n0 + i
                if n == num {
                   drawSourceLine(sourceLines[n], n, x.Start, x.End)
-               } else {
+               } else if n < len(sourceLines) {
                   drawSourceLine(sourceLines[n], n, 0, 0)
+               } else {
+                  drawSourceLine(sourceLines[0], n, 0, -1)
                }
             }
          default:

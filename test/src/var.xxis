@@ -6,5 +6,4 @@ var -u :list d = hola
 var a = hola
 var a < mundo
 var a > mundo
-var a --delete
-var a --exists
+var a delete

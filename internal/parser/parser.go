@@ -394,6 +394,10 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 				pendingBlock = block
 				pendingParent = if_tok
 			}
+		} else if is_var_cmd(cmd) {
+			elseCandidate = nil
+			varTok := parse_var(cmd)
+			curr.Toks = append(curr.Toks, varTok)
 		} else if is_function_cmd(cmd) {
 			elseCandidate = nil
 			params := parse_function(cmd)

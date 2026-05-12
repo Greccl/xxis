@@ -2,6 +2,7 @@ package parser
 
 import "unicode"
 import "fmt"
+import xxisToken "github.com/Greccl/xxis/internal/token"
 
 func Trim_buffer(buf []rune, left, right bool) []rune {
 	start := 0
@@ -187,6 +188,10 @@ func is_function_cmd(tok *Token) bool {
 	return is_keyword_cmd(tok, "function")
 }
 
+func is_var_cmd(tok *Token) bool {
+	return is_keyword_cmd(tok, "var")
+}
+
 func is_keyword_cmd(tok *Token, word string) bool {
 	if tok.Typ != 'I' {
 		return false
@@ -236,6 +241,197 @@ func parse_function(tok *Token) *Token {
 		node.Start = tok.End
 		node.End = tok.End
 	}
+	return node
+}
+
+func parse_var(tok *Token) *Token {
+	strip_prefix(tok.Toks[0], 3)
+
+	tokens := tok.Toks
+	if len(tokens) > 0 && tokens[0].Typ == 'T' && len(tokens[0].Buf) == 0 {
+		tokens = tokens[1:]
+	}
+
+	scope := xxisToken.VarScopeLocal
+	kind := xxisToken.VarTypeString
+	index := 0
+	pos := 0
+
+	nextWord := func() (string, int, int, bool) {
+		for index < len(tokens) {
+			t := tokens[index]
+			if t.Typ != 'T' {
+				return "", t.Start, t.End, false
+			}
+			for pos < len(t.Buf) && Is_space(t.Buf[pos]) {
+				pos++
+			}
+			if pos >= len(t.Buf) {
+				index++
+				pos = 0
+				continue
+			}
+
+			start := pos
+			for pos < len(t.Buf) && !Is_space(t.Buf[pos]) {
+				pos++
+			}
+			return string(t.Buf[start:pos]), t.Start + start, t.Start + pos, true
+		}
+		return "", tok.End, tok.End, false
+	}
+
+	for {
+		word, wordStart, wordEnd, ok := nextWord()
+		if !ok {
+			panic(ParseError{
+				Msg:   "var requires a variable name",
+				Start: wordStart,
+				End:   wordEnd,
+			})
+		}
+
+		if parsedScope, ok := parse_var_scope(word); ok {
+			scope = parsedScope
+			continue
+		}
+		if parsedType, ok := parse_var_type(word); ok {
+			kind = parsedType
+			continue
+		}
+
+		if !is_var_name(word) {
+			panic(ParseError{
+				Msg:   "invalid var name",
+				Start: wordStart,
+				End:   wordEnd,
+			})
+		}
+		name := &Token{Typ: 'T', Buf: []rune(word), Start: wordStart, End: wordEnd}
+
+		opWord, opStart, opEnd, ok := nextWord()
+		if !ok {
+			panic(ParseError{
+				Msg:   "var requires an operator",
+				Start: opStart,
+				End:   opEnd,
+			})
+		}
+		op, ok := parse_var_operator(opWord)
+		if !ok {
+			panic(ParseError{
+				Msg:   "invalid var operator",
+				Start: opStart,
+				End:   opEnd,
+			})
+		}
+
+		args := var_args_from(tokens, index, pos, opEnd)
+		if op == xxisToken.VarOpDelete {
+			if args != nil && len(args.Toks) > 0 {
+				panic(ParseError{
+					Msg:   "var delete does not accept arguments",
+					Start: args.Start,
+					End:   args.End,
+				})
+			}
+			args = nil
+		} else if args == nil || len(args.Toks) == 0 {
+			panic(ParseError{
+				Msg:   "var operator requires arguments",
+				Start: opStart,
+				End:   opEnd,
+			})
+		}
+
+		return &Token{
+			Typ:   'K',
+			Buf:   []rune{xxisToken.VAR, scope, kind, op},
+			Toks:  []*Token{name, args},
+			Start: tok.Start,
+			End:   tok.End,
+		}
+	}
+}
+
+func parse_var_scope(word string) (rune, bool) {
+	switch word {
+	case "-l", "--local":
+		return xxisToken.VarScopeLocal, true
+	case "-g", "--global":
+		return xxisToken.VarScopeGlobal, true
+	case "-u", "--universal":
+		return xxisToken.VarScopeUniversal, true
+	}
+	return 0, false
+}
+
+func parse_var_type(word string) (rune, bool) {
+	switch word {
+	case ":s", ":str", ":string":
+		return xxisToken.VarTypeString, true
+	case ":n", ":num", ":number", ":float":
+		return xxisToken.VarTypeFloat, true
+	case ":j", ":job", ":proc", ":process", ":proceso":
+		return xxisToken.VarTypeProcess, true
+	case ":p", ":path":
+		return xxisToken.VarTypePath, true
+	case ":l", ":list", ":lista":
+		return xxisToken.VarTypeList, true
+	case ":d", ":dict", ":dictionary", ":diccionario":
+		return xxisToken.VarTypeDict, true
+	}
+	return 0, false
+}
+
+func parse_var_operator(word string) (rune, bool) {
+	switch word {
+	case "=":
+		return xxisToken.VarOpAssign, true
+	case "<":
+		return xxisToken.VarOpAppend, true
+	case ">":
+		return xxisToken.VarOpPrepend, true
+	case "delete", "--delete":
+		return xxisToken.VarOpDelete, true
+	}
+	return 0, false
+}
+
+func is_var_name(word string) bool {
+	buf := []rune(word)
+	if len(buf) == 0 || !is_iden_start(buf[0]) {
+		return false
+	}
+	for _, r := range buf[1:] {
+		if !is_iden_char(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func var_args_from(tokens []*Token, index, pos, emptyAt int) *Token {
+	args := make([]*Token, 0)
+	if index < len(tokens) {
+		t := tokens[index]
+		if t.Typ == 'T' {
+			buf, start := trimBufferRange(t.Buf[pos:], t.Start+pos, true, false)
+			if len(buf) > 0 {
+				ctx := &ParseContext0{}
+				ctx.init()
+				ctx.new_segment(Segment{typ: 'R', offset: start, buf: buf})
+				parsed := subcmd_by_text(ctx)
+				args = append(args, parsed.Toks...)
+			}
+			args = append(args, tokens[index+1:]...)
+		} else {
+			args = append(args, tokens[index:]...)
+		}
+	}
+
+	node := &Token{Typ: 'C', Toks: args, Start: emptyAt, End: emptyAt}
+	inheritRangeFromChildren(node)
 	return node
 }
 
