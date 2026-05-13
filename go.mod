@@ -2,7 +2,10 @@ module github.com/Greccl/xxis
 
 go 1.26.1
 
-require github.com/gdamore/tcell/v3 v3.3.0
+require (
+	github.com/gdamore/tcell/v3 v3.3.0
+	github.com/spf13/pflag v1.0.10
+)
 
 require (
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect

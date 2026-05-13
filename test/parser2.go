@@ -13,6 +13,7 @@ import (
 	xxisToken "github.com/Greccl/xxis/internal/token"
 	"github.com/gdamore/tcell/v3"
 	"github.com/gdamore/tcell/v3/color"
+	"github.com/spf13/pflag"
 )
 
 type Token = xxisToken.Token
@@ -196,7 +197,12 @@ func drawSourceLine(line SourceLine, index, selStart, selEnd int) {
 
 
 func main() {
-	path := "test/src/var.xxis"
+	pflag.Parse()
+	args := pflag.Args()
+	if len(args) < 1 {
+		return
+	}
+	path := args[0]
 
 	// home, _ := os.UserHomeDir()
 	// path := filepath.Join(home, "dev", "xxis", "test1.txt")
