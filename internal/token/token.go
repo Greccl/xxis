@@ -5,19 +5,37 @@ import (
 )
 
 const (
-   IF rune = iota
-   IFZ
-   IFN
-   FOR
-   VAR
+	IF rune = iota
+	IFZ
+	IFN
+	FOR
+	VAR
 )
 
 var KEYWORDS = []string{
-   "if",
-   "ifz",
-   "ifn",
-   "for",
-   "var",
+	"if",
+	"ifz",
+	"ifn",
+	"for",
+	"var",
+}
+
+const (
+	IfCondExpr rune = iota
+	IfCondSuccess
+	IfCondFailure
+)
+
+func IfCondName(mode rune) string {
+	switch mode {
+	case IfCondExpr:
+		return "expr"
+	case IfCondSuccess:
+		return "success"
+	case IfCondFailure:
+		return "failure"
+	}
+	return "unknown"
 }
 
 const (
@@ -100,8 +118,17 @@ func (tok *Token) Repr() string {
 		name := KEYWORDS[tok.Buf[0]]
 		if tok.Buf[0] == VAR && len(tok.Buf) >= 4 {
 			argTyp := '-'
-			if len(tok.Toks) > 1 && tok.Toks[1] != nil { argTyp = tok.Toks[1].Typ }
+			if len(tok.Toks) > 1 && tok.Toks[1] != nil {
+				argTyp = tok.Toks[1].Typ
+			}
 			return fmt.Sprintf("%s scope=%s type=%s op=%s {%c}:{%c}", name, VarScopeName(tok.Buf[1]), VarTypeName(tok.Buf[2]), VarOpName(tok.Buf[3]), tok.Toks[0].Typ, argTyp)
+		}
+		if tok.Buf[0] == IF && len(tok.Buf) >= 2 {
+			exprIndex := ""
+			if tok.Buf[1] == IfCondExpr && len(tok.Buf) >= 3 {
+				exprIndex = fmt.Sprintf(" expr=%d", tok.Buf[2])
+			}
+			return fmt.Sprintf("%s mode=%s%s {%c}:{%c}:{%c}", name, IfCondName(tok.Buf[1]), exprIndex, tokenTyp(tok, 0), tokenTyp(tok, 1), tokenTyp(tok, 2))
 		}
 		if len(tok.Toks) == 3 {
 			return fmt.Sprintf("%s {%c}:{%c}:{%c}", name, tok.Toks[0].Typ, tok.Toks[1].Typ, tok.Toks[2].Typ)
@@ -132,30 +159,39 @@ func (tok *Token) Name() string {
 	a := fmt.Sprintf("%c ", tok.Typ)
 	var b string
 	if len(tok.Buf) > 0 {
-	   switch tok.Typ {
+		switch tok.Typ {
 		case 'R':
 			b = fmt.Sprintf("REG[%d]", tok.Buf[0])
 		case 'K':
 			if tok.Buf[0] == VAR && len(tok.Buf) >= 4 {
 				b = fmt.Sprintf("{var} %s %s %s", VarScopeName(tok.Buf[1]), VarTypeName(tok.Buf[2]), VarOpName(tok.Buf[3]))
+			} else if tok.Buf[0] == IF && len(tok.Buf) >= 2 {
+				b = fmt.Sprintf("{if} %s", IfCondName(tok.Buf[1]))
+				if tok.Buf[1] == IfCondExpr && len(tok.Buf) >= 3 {
+					b = fmt.Sprintf("%s expr=%d", b, tok.Buf[2])
+				}
 			} else {
 				b = fmt.Sprintf("{%s}", KEYWORDS[tok.Buf[0]])
 			}
 		case 'S':
 			b = fmt.Sprintf("{%c}", tok.Buf[0])
 			if tok.Buf[1] >= 0 {
-			   b = fmt.Sprintf("%s -> %d", b, tok.Buf[1])
+				b = fmt.Sprintf("%s -> %d", b, tok.Buf[1])
 			}
 		default:
 			b = fmt.Sprintf("'%s'", string(tok.Buf))
-	   }
+		}
 	}
 	c := fmt.Sprintf(" - %d:%d", tok.Start, tok.End)
 	return a + b + c
 }
 
-
-
+func tokenTyp(tok *Token, index int) rune {
+	if index >= len(tok.Toks) || tok.Toks[index] == nil {
+		return '-'
+	}
+	return tok.Toks[index].Typ
+}
 
 func (tok *Token) Dump() {
 	tok.dump_node([]bool{}, false)
@@ -178,11 +214,11 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 		}
 	}
 
-   if tok != nil {
-      fmt.Println(tok.Name())
+	if tok != nil {
+		fmt.Println(tok.Name())
 	} else {
-	   fmt.Printf("@NIL\n")
-	   return
+		fmt.Printf("@NIL\n")
+		return
 	}
 
 	newPrefix := make([]bool, len(prefix)+1)
@@ -194,14 +230,12 @@ func (tok *Token) dump_node(prefix []bool, isLast bool) {
 	}
 }
 
-
-
-func (tok *Token) BuildNodes(printer func(*Token,string,string)) {
+func (tok *Token) BuildNodes(printer func(*Token, string, string)) {
 	tok.build_node([]bool{}, false, printer)
 }
 
-func (tok *Token) build_node(prefix []bool, isLast bool, printer func(*Token,string,string)) {
-   var p, n string
+func (tok *Token) build_node(prefix []bool, isLast bool, printer func(*Token, string, string)) {
+	var p, n string
 
 	for i, hasNext := range prefix {
 		if i == len(prefix)-1 {
@@ -219,15 +253,14 @@ func (tok *Token) build_node(prefix []bool, isLast bool, printer func(*Token,str
 		}
 	}
 
-   if tok != nil {
-      n = tok.Name()
-   	printer(tok, p, n)
+	if tok != nil {
+		n = tok.Name()
+		printer(tok, p, n)
 	} else {
-	   n = "@NIL"
-   	printer(tok, p, n)
-   	return
+		n = "@NIL"
+		printer(tok, p, n)
+		return
 	}
-
 
 	newPrefix := make([]bool, len(prefix)+1)
 	copy(newPrefix, prefix)

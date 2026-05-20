@@ -378,11 +378,15 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 
 		if is_if_cmd(cmd) {
 			elseCandidate = nil
-			cond, body := parse_if(cmd)
+			cond, body, mode, exprIndex := parse_if(cmd)
 			inheritRangeFromChildren(cond)
 			block := &Token{Typ: 'B', Toks: make([]*Token, 0)}
 			inheritRangeFromChildren(block)
-			if_tok := &Token{Typ: 'K', Buf: []rune{xxisToken.IF}, Toks: []*Token{cond, block, nil}}
+			ifBuf := []rune{xxisToken.IF, mode}
+			if mode == xxisToken.IfCondExpr {
+				ifBuf = append(ifBuf, rune(exprIndex))
+			}
+			if_tok := &Token{Typ: 'K', Buf: ifBuf, Toks: []*Token{cond, block, nil}}
 			curr.Toks = append(curr.Toks, if_tok)
 			if_tok.Start = cmd.Start
 			if body != nil {

@@ -33,19 +33,6 @@ func MustParseTokens(tokens []*xxisToken.Token) *Node {
 }
 
 func parse(lex *lexer) (node *Node, err error) {
-   /*
-	defer func() {
-		if r := recover(); r != nil {
-			if e, ok := r.(*ExprError); ok {
-				node = nil
-				err = e
-				return
-			}
-			panic(r)
-		}
-	}()
-   */
-
 	p := &parser{lex: lex}
 	p.advance()
 	node = p.parseExpr()
@@ -274,5 +261,5 @@ func (p *parser) errorAt(tok lexToken, msg string) {
 		start = p.prevEnd
 		end = p.prevEnd
 	}
-	panic(&ExprError{Msg: msg, Start: start, End: end})
+	panic(ExprError{Msg: msg, Start: start, End: end})
 }

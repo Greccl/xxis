@@ -9,6 +9,7 @@ import (
 	// "path/filepath"
 	// xxisCompiler "github.com/Greccl/xxis/internal/compiler"
 	xxisParser "github.com/Greccl/xxis/internal/parser"
+	xxisExpr "github.com/Greccl/xxis/internal/expr"
 	// xxisVm "github.com/Greccl/xxis/internal/vm"
 	xxisToken "github.com/Greccl/xxis/internal/token"
 	"github.com/gdamore/tcell/v3"
@@ -228,24 +229,30 @@ func main() {
 	sourceLines := buildSourceLines(lines)
 	file.Close()
 
+   printErr := func(msg string, start, end int) {
+      num := getLine(start)
+      fmt.Printf("%s, line %d: %s\n", path, num+1, msg)
+      n0 := num - 2
+      if n0 < 0 { n0 = 0 }
+      for i:=0; i<5; i++ {
+         n := n0 + i
+         if n == num {
+            drawSourceLine(sourceLines[n], n, start, end)
+         } else if n < len(sourceLines) {
+            drawSourceLine(sourceLines[n], n, 0, 0)
+         } else {
+            drawSourceLine(sourceLines[0], n, 0, -1)
+         }
+      }
+   }
+
    defer func() {
       if err := recover(); err != nil {
          switch x := err.(type) {
          case xxisParser.ParseError:
-            num := getLine(x.Start)
-            fmt.Printf("%s, line %d: %s\n", path, num+1, x.Msg)
-            n0 := num - 2
-            if n0 < 0 { n0 = 0 }
-            for i:=0; i<5; i++ {
-               n := n0 + i
-               if n == num {
-                  drawSourceLine(sourceLines[n], n, x.Start, x.End)
-               } else if n < len(sourceLines) {
-                  drawSourceLine(sourceLines[n], n, 0, 0)
-               } else {
-                  drawSourceLine(sourceLines[0], n, 0, -1)
-               }
-            }
+            printErr(x.Msg, x.Start, x.End)
+         case xxisExpr.ExprError:
+            printErr(x.Msg, x.Start, x.End)
          default:
             panic(err)
          }

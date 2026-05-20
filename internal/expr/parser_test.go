@@ -127,15 +127,35 @@ func mustParseTest(t *testing.T, src string) *Node {
 
 func assertParseError(t *testing.T, src, msg string) {
 	t.Helper()
-	_, err := Parse(src)
-	if err == nil {
-		t.Fatalf("Parse(%q) did not fail", src)
+
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fatalf("Parse(%q) did not fail", src)
+		}
+		exprErr, ok := err.(*ExprError)
+		if !ok {
+			t.Fatalf("Parse(%q) panic = %T, want *ExprError", src, err)
+		}
+		if exprErr.Msg != msg {
+			t.Fatalf("Parse(%q) Msg = %q, want %q", src, exprErr.Msg, msg)
+		}
+	}()
+
+	Parse(src)
+}
+
+func TestRegistryStoresNodes(t *testing.T) {
+	node := mustParseTest(t, "1 + 2")
+	index := Store(node)
+
+	if got := Get(index); got != node {
+		t.Fatalf("Get(%d) = %p, want %p", index, got, node)
 	}
-	exprErr, ok := err.(*ExprError)
-	if !ok {
-		t.Fatalf("Parse(%q) error = %T, want *ExprError", src, err)
+	if got := Get(-1); got != nil {
+		t.Fatalf("Get(-1) = %p, want nil", got)
 	}
-	if exprErr.Msg != msg {
-		t.Fatalf("Parse(%q) Msg = %q, want %q", src, exprErr.Msg, msg)
+	if got := Get(index + 1); got != nil {
+		t.Fatalf("Get(%d) = %p, want nil", index+1, got)
 	}
 }

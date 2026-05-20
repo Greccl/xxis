@@ -2,6 +2,7 @@ package parser
 
 import "unicode"
 import "fmt"
+import xxisExpr "github.com/Greccl/xxis/internal/expr"
 import xxisToken "github.com/Greccl/xxis/internal/token"
 
 func Trim_buffer(buf []rune, left, right bool) []rune {
@@ -213,18 +214,93 @@ func is_keyword_cmd(tok *Token, word string) bool {
 	return Is_space(buf[len(prefix)])
 }
 
-func parse_if(tok *Token) (*Token, *Token) {
+func parse_if(tok *Token) (*Token, *Token, rune, int) {
 	strip_prefix(tok.Toks[0], 2)
 	cond, body := split_by_colon(tok.Toks)
-	if body == nil {
-		c := split_and_or(&Token{Typ: 'C', Toks: cond})
-		return c, nil
-	} else {
-		c := split_and_or(&Token{Typ: 'C', Toks: cond})
-		b := split_and_or(&Token{Typ: 'C', Toks: body})
-		inheritRangeFromChildren(b)
-		return c, b
+
+	mode, cmdCond, isCmdCond := parse_if_cond_mode(cond)
+	if isCmdCond {
+		if !has_if_cond_tokens(cmdCond) {
+			panic(ParseError{
+				Msg:   "if command condition requires a command",
+				Start: tok.Start,
+				End:   tok.End,
+			})
+		}
+		c := split_and_or(&Token{Typ: 'C', Toks: cmdCond})
+		return c, parse_if_body(body), mode, -1
 	}
+
+	node, _ := xxisExpr.ParseTokens(cond)
+	exprIndex := xxisExpr.Store(node)
+	c := &Token{Typ: 'C', Toks: cond}
+	inheritRangeFromChildren(c)
+	return c, parse_if_body(body), xxisToken.IfCondExpr, exprIndex
+}
+
+func parse_if_body(body []*Token) *Token {
+	if body == nil {
+		return nil
+	}
+	b := split_and_or(&Token{Typ: 'C', Toks: body})
+	inheritRangeFromChildren(b)
+	return b
+}
+
+func parse_if_cond_mode(tokens []*Token) (rune, []*Token, bool) {
+	for i, tok := range tokens {
+		if tok == nil {
+			continue
+		}
+		if tok.Typ != 'T' {
+			return xxisToken.IfCondExpr, tokens, false
+		}
+
+		buf, start := trimBufferRange(tok.Buf, tok.Start, true, false)
+		if len(buf) == 0 {
+			continue
+		}
+
+		wordEnd := 0
+		for wordEnd < len(buf) && !Is_space(buf[wordEnd]) {
+			wordEnd++
+		}
+
+		mode := xxisToken.IfCondExpr
+		switch string(buf[:wordEnd]) {
+		case "success":
+			mode = xxisToken.IfCondSuccess
+		case "failure":
+			mode = xxisToken.IfCondFailure
+		default:
+			return xxisToken.IfCondExpr, tokens, false
+		}
+
+		rest, restStart := trimBufferRange(buf[wordEnd:], start+wordEnd, true, false)
+		cmdTokens := make([]*Token, 0, len(tokens)-i)
+		if len(rest) > 0 {
+			cmdTokens = append(cmdTokens, &Token{Typ: 'T', Buf: rest, Start: restStart, End: restStart + len(rest)})
+		}
+		cmdTokens = append(cmdTokens, tokens[i+1:]...)
+		return mode, cmdTokens, true
+	}
+
+	return xxisToken.IfCondExpr, tokens, false
+}
+
+func has_if_cond_tokens(tokens []*Token) bool {
+	for _, tok := range tokens {
+		if tok == nil {
+			continue
+		}
+		if tok.Typ != 'T' {
+			return true
+		}
+		if len(Trim_buffer(tok.Buf, true, true)) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func parse_function(tok *Token) *Token {
