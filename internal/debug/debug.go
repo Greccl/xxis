@@ -1,20 +1,20 @@
-package main
+package debug
 
 import (
-	"bufio"
+	// "bufio"
 	"fmt"
-	"log"
 	"os"
 	"unicode/utf8"
 	// "path/filepath"
 	// xxisCompiler "github.com/Greccl/xxis/internal/compiler"
-	xxisParser "github.com/Greccl/xxis/internal/parser"
-	xxisExpr "github.com/Greccl/xxis/internal/expr"
+	// xxisParser "github.com/Greccl/xxis/internal/parser"
+	// xxisExpr "github.com/Greccl/xxis/internal/expr"
 	// xxisVm "github.com/Greccl/xxis/internal/vm"
 	xxisToken "github.com/Greccl/xxis/internal/token"
+	xxisError "github.com/Greccl/xxis/internal/errors"
 	"github.com/gdamore/tcell/v3"
 	"github.com/gdamore/tcell/v3/color"
-	"github.com/spf13/pflag"
+	// "github.com/spf13/pflag"
 )
 
 type Token = xxisToken.Token
@@ -25,12 +25,6 @@ type AstNode struct {
 	name     string
 	parent   int
 	children []int
-}
-
-type SourceLine struct {
-	text  string
-	start int
-	end   int
 }
 
 func countNodes(tok *Token) int {
@@ -117,23 +111,6 @@ func moveToFirstChild(nodes []AstNode, inode int) int {
 	return nodes[inode].children[0]
 }
 
-// func (self )
-
-func buildSourceLines(lines []string) []SourceLine {
-	out := make([]SourceLine, 0, len(lines))
-	off := 0
-	for _, line := range lines {
-		size := len([]rune(line))
-		out = append(out, SourceLine{
-			text:  line,
-			start: off,
-			end:   off + size,
-		})
-		off += size + 1
-	}
-	return out
-}
-
 func clamp(v, lo, hi int) int {
 	if v < lo {
 		return lo
@@ -144,17 +121,17 @@ func clamp(v, lo, hi int) int {
 	return v
 }
 
-func drawHighlightedLine(s tcell.Screen, x, y int, line SourceLine, selStart, selEnd int, defStyle, hiStyle tcell.Style) {
+func drawHighlightedLine(s tcell.Screen, x, y int, line xxisError.SourceLine, selStart, selEnd int, defStyle, hiStyle tcell.Style) {
 	if selEnd-selStart == 0 {
-		s.PutStrStyled(x, y, line.text, defStyle)
+		s.PutStrStyled(x, y, line.Text, defStyle)
 		return
 	}
-	runes := []rune(line.text)
-	a := clamp(selStart-line.start, 0, len(runes))
-	b := clamp(selEnd-line.start, 0, len(runes))
+	runes := []rune(line.Text)
+	a := clamp(selStart-line.Start, 0, len(runes))
+	b := clamp(selEnd-line.Start, 0, len(runes))
 
 	if a >= b {
-		s.PutStrStyled(x, y, line.text, defStyle)
+		s.PutStrStyled(x, y, line.Text, defStyle)
 		return
 	}
 
@@ -163,106 +140,8 @@ func drawHighlightedLine(s tcell.Screen, x, y int, line SourceLine, selStart, se
 	s.PutStrStyled(x+b, y, string(runes[b:]), defStyle)
 }
 
-func drawSourceLine(line SourceLine, index, selStart, selEnd int) {
-   if selEnd == -1 {
-      fmt.Printf("\033[38;2;235m   |\033[0m\n")
-      return
-   }
-
-   l := selEnd - selStart
-
-   if l == 0 {
-      fmt.Print("\033[38;2;235m")
-   }
-
-   fmt.Printf("%3d| ", index+1)
-	if l == 0 {
-		fmt.Printf("%s\033[0m\n", line.text)
-		return
-	}
-
-	runes := []rune(line.text)
-	a := clamp(selStart-line.start, 0, len(runes))
-	b := clamp(selEnd-line.start, 0, len(runes))
-
-	if a >= b {
-		fmt.Printf("%s\n", line.text)
-		return
-	}
-
-   fmt.Print("\033[38;2;255m")
-	fmt.Printf("%s", string(runes[:a]))
-	fmt.Printf("\033[31m%s\033[0m", string(runes[a:b]))
-	fmt.Printf("%s\n", string(runes[b:]))
-}
-
-
-func main() {
-	pflag.Parse()
-	args := pflag.Args()
-	if len(args) < 1 {
-		return
-	}
-	path := args[0]
-
-	// home, _ := os.UserHomeDir()
-	// path := filepath.Join(home, "dev", "xxis", "test1.txt")
-	read, getLine := xxisParser.Enumerate_file(path)
-
-	file, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close() // Ensure the file is closed
-
-	scanner := bufio.NewScanner(file)
-
-	lines := make([]string, 0)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text()) // .Text() returns the line as a string
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
-	}
-
-	sourceLines := buildSourceLines(lines)
-	file.Close()
-
-   printErr := func(msg string, start, end int) {
-      num := getLine(start)
-      fmt.Printf("%s, line %d: %s\n", path, num+1, msg)
-      n0 := num - 2
-      if n0 < 0 { n0 = 0 }
-      for i:=0; i<5; i++ {
-         n := n0 + i
-         if n == num {
-            drawSourceLine(sourceLines[n], n, start, end)
-         } else if n < len(sourceLines) {
-            drawSourceLine(sourceLines[n], n, 0, 0)
-         } else {
-            drawSourceLine(sourceLines[0], n, 0, -1)
-         }
-      }
-   }
-
-   defer func() {
-      if err := recover(); err != nil {
-         switch x := err.(type) {
-         case xxisError.ErrorWithRange:
-            xxisError.Print(x)
-         default:
-            panic(err)
-         }
-         os.Exit(1)
-      }
-   }()
-
-	// src0 := "cmd 1\nif cmd 2\n   cmd '3' $(hola)!(mundo)\n   if cmd 4   :   exit\n   last in block\nelse\n   it works\nend\ncmd 5 && cmd '6 $var6' || cmd 7"
-	// read := xxisParser.Enumerate_string(src0)
-
-	next := xxisParser.Enumerate_tokens(read)
-	ast := xxisParser.Build_ast_from_tokens(next)
+func DebugScreen(ast *Token) {
+   sourceLines := xxisError.BuildSourceLines()
 
 	view := New_AstView(ast)
 
@@ -426,26 +305,3 @@ func main() {
 		}
 	}
 }
-
-/*
-func drawText(s tcell.Screen, x1, y1, x2, y2 int, style tcell.Style, text string) {
-	row := y1
-	col := x1
-	var width int
-	for text != "" {
-		text, width = s.Put(col, row, text, style)
-		col += width
-		if col >= x2 {
-			row++
-			col = x1
-		}
-		if row > y2 {
-			break
-		}
-		if width == 0 {
-			// incomplete grapheme at end of string
-			break
-		}
-	}
-}
-*/

@@ -1,8 +1,11 @@
 package parser
 
 import xxisToken "github.com/Greccl/xxis/internal/token"
+import xxisError "github.com/Greccl/xxis/internal/errors"
 
 type Token = xxisToken.Token
+type ErrorWithRange = xxisError.ErrorWithRange
+type ParseError = xxisError.ErrorWithRange
 
 const (
 	tokenIndent rune = '>'
@@ -78,7 +81,7 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 		}
 		for indent < curr {
 			if len(indentStack) == 1 {
-				panic(ParseError{
+				panic(ErrorWithRange{
 					Msg:   "unmatched dedent",
 					Start: offset,
 					End:   offset,
@@ -89,7 +92,7 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 			curr = indentStack[len(indentStack)-1]
 		}
 		if indent != curr {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "unmatched dedent",
 				Start: offset,
 				End:   offset,
@@ -145,7 +148,7 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 					continue
 				}
 				if lineIndentHasSpaces {
-					panic(ParseError{
+					panic(ErrorWithRange{
 						Msg:   "indentation must use tabs",
 						Start: i,
 						End:   i + 1,
@@ -291,6 +294,14 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 	return yield
 }
 
+func BuildAstFromPath(path string) *Token {
+	defer xxisError.SetErrorPath(path)
+	read, _ := Enumerate_file(path)
+	next := Enumerate_tokens(read)
+	ast := Build_ast_from_tokens(next)
+	return ast
+}
+
 func Build_ast_from_tokens(next TokenSource) *Token {
 	root := &Token{Typ: 'P', Toks: make([]*Token, 0)}
 	mainParams := &Token{Typ: 'T'}
@@ -318,7 +329,7 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 
 	closeBlock := func(tok *Token) {
 		if len(stack) == 0 {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "unexpected dedent",
 				Start: tok.Start,
 				End:   tok.End,
@@ -348,7 +359,7 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 
 		if cmd.Typ == tokenIndent {
 			if pendingBlock == nil {
-				panic(ParseError{
+				panic(ErrorWithRange{
 					Msg:   "unexpected indent",
 					Start: cmd.Start,
 					End:   cmd.End,
@@ -359,7 +370,7 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 		}
 		if cmd.Typ == tokenDedent {
 			if pendingBlock != nil {
-				panic(ParseError{
+				panic(ErrorWithRange{
 					Msg:   "expected indented block",
 					Start: cmd.Start,
 					End:   cmd.End,
@@ -369,7 +380,7 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 			continue
 		}
 		if pendingBlock != nil {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "expected indented block",
 				Start: cmd.Start,
 				End:   cmd.End,
@@ -402,6 +413,14 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 			elseCandidate = nil
 			varTok := parse_var(cmd)
 			curr.Toks = append(curr.Toks, varTok)
+		} else if is_import_cmd(cmd) {
+			elseCandidate = nil
+			importTok := parse_import(cmd)
+			curr.Toks = append(curr.Toks, importTok)
+		} else if is_source_cmd(cmd) {
+			elseCandidate = nil
+			sourceTok := parse_source(cmd)
+			curr.Toks = append(curr.Toks, sourceTok)
 		} else if is_function_cmd(cmd) {
 			elseCandidate = nil
 			params := parse_function(cmd)
@@ -413,7 +432,7 @@ func Build_ast_from_tokens(next TokenSource) *Token {
 			pendingParent = fn
 		} else if is_single_word(cmd, "else") {
 			if elseCandidate == nil {
-				panic(ParseError{
+				panic(ErrorWithRange{
 					Msg:   "else outside if",
 					Start: cmd.Start,
 					End:   cmd.End,

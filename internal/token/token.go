@@ -10,6 +10,8 @@ const (
 	IFN
 	FOR
 	VAR
+	IMPORT
+	SOURCE
 )
 
 var KEYWORDS = []string{
@@ -18,6 +20,8 @@ var KEYWORDS = []string{
 	"ifn",
 	"for",
 	"var",
+	"import",
+	"source",
 }
 
 const (

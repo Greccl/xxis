@@ -1,7 +1,6 @@
 package parser
 
 import "unicode"
-import "fmt"
 import xxisExpr "github.com/Greccl/xxis/internal/expr"
 import xxisToken "github.com/Greccl/xxis/internal/token"
 
@@ -193,6 +192,14 @@ func is_var_cmd(tok *Token) bool {
 	return is_keyword_cmd(tok, "var")
 }
 
+func is_import_cmd(tok *Token) bool {
+	return is_keyword_cmd(tok, "import")
+}
+
+func is_source_cmd(tok *Token) bool {
+	return is_keyword_cmd(tok, "source")
+}
+
 func is_keyword_cmd(tok *Token, word string) bool {
 	if tok.Typ != 'I' {
 		return false
@@ -221,7 +228,7 @@ func parse_if(tok *Token) (*Token, *Token, rune, int) {
 	mode, cmdCond, isCmdCond := parse_if_cond_mode(cond)
 	if isCmdCond {
 		if !has_if_cond_tokens(cmdCond) {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "if command condition requires a command",
 				Start: tok.Start,
 				End:   tok.End,
@@ -360,7 +367,7 @@ func parse_var(tok *Token) *Token {
 	for {
 		word, wordStart, wordEnd, ok := nextWord()
 		if !ok {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "var requires a variable name",
 				Start: wordStart,
 				End:   wordEnd,
@@ -377,7 +384,7 @@ func parse_var(tok *Token) *Token {
 		}
 
 		if !is_var_name(word) {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "invalid var name",
 				Start: wordStart,
 				End:   wordEnd,
@@ -387,7 +394,7 @@ func parse_var(tok *Token) *Token {
 
 		opWord, opStart, opEnd, ok := nextWord()
 		if !ok {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "var requires an operator",
 				Start: opStart,
 				End:   opEnd,
@@ -395,7 +402,7 @@ func parse_var(tok *Token) *Token {
 		}
 		op, ok := parse_var_operator(opWord)
 		if !ok {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "invalid var operator",
 				Start: opStart,
 				End:   opEnd,
@@ -405,7 +412,7 @@ func parse_var(tok *Token) *Token {
 		args := var_args_from(tokens, index, pos, opEnd)
 		if op == xxisToken.VarOpDelete {
 			if args != nil && len(args.Toks) > 0 {
-				panic(ParseError{
+				panic(ErrorWithRange{
 					Msg:   "var delete does not accept arguments",
 					Start: args.Start,
 					End:   args.End,
@@ -413,7 +420,7 @@ func parse_var(tok *Token) *Token {
 			}
 			args = nil
 		} else if args == nil || len(args.Toks) == 0 {
-			panic(ParseError{
+			panic(ErrorWithRange{
 				Msg:   "var operator requires arguments",
 				Start: opStart,
 				End:   opEnd,
@@ -427,6 +434,196 @@ func parse_var(tok *Token) *Token {
 			Start: tok.Start,
 			End:   tok.End,
 		}
+	}
+}
+
+type keywordArgScanner struct {
+	tokens []*Token
+	index  int
+	pos    int
+	end    int
+}
+
+func new_keyword_arg_scanner(tok *Token, prefixLen int) *keywordArgScanner {
+	strip_prefix(tok.Toks[0], prefixLen)
+
+	tokens := tok.Toks
+	if len(tokens) > 0 && tokens[0].Typ == 'T' && len(tokens[0].Buf) == 0 {
+		tokens = tokens[1:]
+	}
+
+	return &keywordArgScanner{tokens: tokens, end: tok.End}
+}
+
+func (self *keywordArgScanner) nextWord() (string, int, int, bool) {
+	for self.index < len(self.tokens) {
+		t := self.tokens[self.index]
+		if t.Typ != 'T' {
+			return "", t.Start, t.End, false
+		}
+		for self.pos < len(t.Buf) && Is_space(t.Buf[self.pos]) {
+			self.pos++
+		}
+		if self.pos >= len(t.Buf) {
+			self.index++
+			self.pos = 0
+			continue
+		}
+
+		start := self.pos
+		for self.pos < len(t.Buf) && !Is_space(t.Buf[self.pos]) {
+			self.pos++
+		}
+		return string(t.Buf[start:self.pos]), t.Start + start, t.Start + self.pos, true
+	}
+	return "", self.end, self.end, false
+}
+
+func (self *keywordArgScanner) nextPath() (string, int, int, bool) {
+	for self.index < len(self.tokens) {
+		t := self.tokens[self.index]
+		if t.Typ == 'T' {
+			for self.pos < len(t.Buf) && Is_space(t.Buf[self.pos]) {
+				self.pos++
+			}
+			if self.pos >= len(t.Buf) {
+				self.index++
+				self.pos = 0
+				continue
+			}
+			return self.nextWord()
+		}
+
+		if t.Typ == 'Q' {
+			if self.pos != 0 {
+				return "", t.Start, t.End, false
+			}
+			self.index++
+			return quoted_literal(t)
+		}
+
+		return "", t.Start, t.End, false
+	}
+	return "", self.end, self.end, false
+}
+
+func (self *keywordArgScanner) empty() (int, int, bool) {
+	for self.index < len(self.tokens) {
+		t := self.tokens[self.index]
+		if t.Typ != 'T' {
+			return t.Start, t.End, false
+		}
+		for self.pos < len(t.Buf) {
+			if !Is_space(t.Buf[self.pos]) {
+				return t.Start + self.pos, t.End, false
+			}
+			self.pos++
+		}
+		self.index++
+		self.pos = 0
+	}
+	return self.end, self.end, true
+}
+
+func quoted_literal(tok *Token) (string, int, int, bool) {
+	var buf []rune
+	for _, child := range tok.Toks {
+		if child.Typ != 'T' {
+			return "", child.Start, child.End, false
+		}
+		buf = append(buf, child.Buf...)
+	}
+	if len(buf) == 0 {
+		return "", tok.Start, tok.End, false
+	}
+	return string(buf), tok.Start, tok.End, true
+}
+
+func parse_import(tok *Token) *Token {
+	scanner := new_keyword_arg_scanner(tok, 6)
+
+	path, pathStart, pathEnd, ok := scanner.nextPath()
+	if !ok || path == "" {
+		panic(ErrorWithRange{
+			Msg:   "import requires a path",
+			Start: pathStart,
+			End:   pathEnd,
+		})
+	}
+
+	word, wordStart, wordEnd, ok := scanner.nextWord()
+	if !ok || word != "as" {
+		panic(ErrorWithRange{
+			Msg:   "import requires 'as'",
+			Start: wordStart,
+			End:   wordEnd,
+		})
+	}
+
+	name, nameStart, nameEnd, ok := scanner.nextWord()
+	if !ok {
+		panic(ErrorWithRange{
+			Msg:   "import requires a name",
+			Start: nameStart,
+			End:   nameEnd,
+		})
+	}
+	if !is_var_name(name) {
+		panic(ErrorWithRange{
+			Msg:   "invalid import name",
+			Start: nameStart,
+			End:   nameEnd,
+		})
+	}
+
+	extraStart, extraEnd, empty := scanner.empty()
+	if !empty {
+		panic(ErrorWithRange{
+			Msg:   "import does not accept extra arguments",
+			Start: extraStart,
+			End:   extraEnd,
+		})
+	}
+
+	return &Token{
+		Typ: 'K',
+		Buf: []rune{xxisToken.IMPORT},
+		Toks: []*Token{
+			{Typ: 'T', Buf: []rune(path), Start: pathStart, End: pathEnd},
+			{Typ: 'T', Buf: []rune(name), Start: nameStart, End: nameEnd},
+		},
+		Start: tok.Start,
+		End:   tok.End,
+	}
+}
+
+func parse_source(tok *Token) *Token {
+	scanner := new_keyword_arg_scanner(tok, 6)
+
+	path, pathStart, pathEnd, ok := scanner.nextPath()
+	if !ok || path == "" {
+		panic(ErrorWithRange{
+			Msg:   "source requires a path",
+			Start: pathStart,
+			End:   pathEnd,
+		})
+	}
+
+	extraStart, extraEnd, empty := scanner.empty()
+	if !empty {
+		panic(ErrorWithRange{
+			Msg:   "source does not accept extra arguments",
+			Start: extraStart,
+			End:   extraEnd,
+		})
+	}
+
+	return &Token{
+		Typ:   'K',
+		Buf:   []rune{xxisToken.SOURCE},
+		Toks:  []*Token{{Typ: 'T', Buf: []rune(path), Start: pathStart, End: pathEnd}},
+		Start: tok.Start,
+		End:   tok.End,
 	}
 }
 
@@ -637,14 +834,4 @@ func inheritRangeFromChildren(tok *Token) {
 	if last != nil {
 		tok.End = last.End
 	}
-}
-
-type ParseError struct {
-	Msg   string
-	Start int
-	End   int
-}
-
-func (e *ParseError) Error() string {
-	return fmt.Sprintf("ParseError: %s", e.Msg)
 }
