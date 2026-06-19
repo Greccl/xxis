@@ -295,7 +295,7 @@ func Enumerate_tokens(read IndexedRuneSource) TokenSource {
 }
 
 func BuildAstFromPath(path string) *Token {
-	defer xxisError.SetErrorPath(path)
+	defer xxisError.HandlePanicForPath(path)
 	read, _ := Enumerate_file(path)
 	next := Enumerate_tokens(read)
 	ast := Build_ast_from_tokens(next)

@@ -44,6 +44,7 @@ func IfCondName(mode rune) string {
 
 const (
 	VarScopeLocal     rune = 'l'
+	VarScopeShared    rune = 's'
 	VarScopeGlobal    rune = 'g'
 	VarScopeUniversal rune = 'u'
 	VarTypeString     rune = 's'
@@ -62,6 +63,8 @@ func VarScopeName(scope rune) string {
 	switch scope {
 	case VarScopeLocal:
 		return "local"
+	case VarScopeShared:
+		return "shared"
 	case VarScopeGlobal:
 		return "global"
 	case VarScopeUniversal:
@@ -102,15 +105,18 @@ func VarOpName(op rune) string {
 	return "unknown"
 }
 
+
+
 type Token struct {
 	Typ   rune
 	Start int
 	End   int
-	Buf   []rune
+	Data  int
 	Toks  []*Token
 }
 
 func (tok *Token) Repr() string {
+   t := tok.AsVar()
 	switch tok.Typ {
 	case 'T':
 		return fmt.Sprintf("%s", string(tok.Buf))

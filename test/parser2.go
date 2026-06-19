@@ -9,7 +9,7 @@ import (
 	// "path/filepath"
 	// xxisCompiler "github.com/Greccl/xxis/internal/compiler"
 	xxisParser "github.com/Greccl/xxis/internal/parser"
-	xxisExpr "github.com/Greccl/xxis/internal/expr"
+	// xxisExpr "github.com/Greccl/xxis/internal/expr"
 	// xxisVm "github.com/Greccl/xxis/internal/vm"
 	xxisToken "github.com/Greccl/xxis/internal/token"
 	"github.com/gdamore/tcell/v3"

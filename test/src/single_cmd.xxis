@@ -1,0 +1,3 @@
+cmd1 hola "quoted texzt" mundo
+cmd2 print var$some_var
+cmd3 x${var} spacey

@@ -130,6 +130,26 @@ func TestBuildAstWrapsMainAndUserFunctions(t *testing.T) {
 	}
 }
 
+func TestBuildAstParsesSharedVarScope(t *testing.T) {
+	tests := []string{
+		"var -s name = value",
+		"var --shared name = value",
+	}
+
+	for _, src := range tests {
+		t.Run(src, func(t *testing.T) {
+			got := Build_ast_from_tokens(Enumerate_tokens(Enumerate_string(src)))
+			varNode := got.Toks[0].Toks[1].Toks[0]
+			if varNode.Typ != 'K' || len(varNode.Buf) < 4 || varNode.Buf[0] != xxisToken.VAR {
+				t.Fatalf("var node = %q %v, want K VAR", varNode.Typ, varNode.Buf)
+			}
+			if varNode.Buf[1] != xxisToken.VarScopeShared {
+				t.Fatalf("var scope = %s, want shared", xxisToken.VarScopeName(varNode.Buf[1]))
+			}
+		})
+	}
+}
+
 func TestBuildAstUsesTabsForIndentedIfElse(t *testing.T) {
 	src := "if true\n\tthen cmd\nelse\n\telse cmd\nafter"
 	next := Enumerate_tokens(Enumerate_string(src))

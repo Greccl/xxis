@@ -1,20 +1,12 @@
 package debug
 
 import (
-	// "bufio"
 	"fmt"
 	"os"
 	"unicode/utf8"
-	// "path/filepath"
-	// xxisCompiler "github.com/Greccl/xxis/internal/compiler"
-	// xxisParser "github.com/Greccl/xxis/internal/parser"
-	// xxisExpr "github.com/Greccl/xxis/internal/expr"
-	// xxisVm "github.com/Greccl/xxis/internal/vm"
 	xxisToken "github.com/Greccl/xxis/internal/token"
-	xxisError "github.com/Greccl/xxis/internal/errors"
 	"github.com/gdamore/tcell/v3"
 	"github.com/gdamore/tcell/v3/color"
-	// "github.com/spf13/pflag"
 )
 
 type Token = xxisToken.Token
@@ -121,28 +113,7 @@ func clamp(v, lo, hi int) int {
 	return v
 }
 
-func drawHighlightedLine(s tcell.Screen, x, y int, line xxisError.SourceLine, selStart, selEnd int, defStyle, hiStyle tcell.Style) {
-	if selEnd-selStart == 0 {
-		s.PutStrStyled(x, y, line.Text, defStyle)
-		return
-	}
-	runes := []rune(line.Text)
-	a := clamp(selStart-line.Start, 0, len(runes))
-	b := clamp(selEnd-line.Start, 0, len(runes))
-
-	if a >= b {
-		s.PutStrStyled(x, y, line.Text, defStyle)
-		return
-	}
-
-	s.PutStrStyled(x, y, string(runes[:a]), defStyle)
-	s.PutStrStyled(x+a, y, string(runes[a:b]), hiStyle)
-	s.PutStrStyled(x+b, y, string(runes[b:]), defStyle)
-}
-
-func DebugScreen(ast *Token) {
-   sourceLines := xxisError.BuildSourceLines()
-
+func DebugAst(ast *Token) {
 	view := New_AstView(ast)
 
 	s, err := tcell.NewScreen()
@@ -160,7 +131,6 @@ func DebugScreen(ast *Token) {
 	s.SetStyle(defStyle)
 
 	nodeStyle := tcell.StyleDefault.Background(color.Reset).Foreground(color.NewRGBColor(50, 250, 0))
-	textStyle := tcell.StyleDefault.Foreground(color.Black).Background(color.NewRGBColor(50, 250, 0))
 
 	// Clear screen
 	s.Clear()
@@ -170,13 +140,10 @@ func DebugScreen(ast *Token) {
 		os.Exit(0)
 	}
 
-	// scrw, scrh := s.Size()
-
-	boxh := 12
+	boxh := 18
 	inode := 0
 	node0 := 0
 	node1 := boxh - 1
-	base := boxh + 1
 
 	drawAll := func() {
 		s.SetStyle(defStyle)
@@ -204,48 +171,13 @@ func DebugScreen(ast *Token) {
 				for range node.prefix {
 					l++
 				}
-				s.PutStrStyled(0, base+i, node.prefix, defStyle)
+				s.PutStrStyled(0, i, node.prefix, defStyle)
 				if in == inode {
-					s.PutStrStyled(l, base+i, node.name, nodeStyle)
+					s.PutStrStyled(l, i, node.name, nodeStyle)
 				} else {
-					s.PutStrStyled(l, base+i, node.name, defStyle)
+					s.PutStrStyled(l, i, node.name, defStyle)
 				}
 				in++
-			}
-		}
-
-		tok := view[inode].tok
-		if tok == nil {
-			tok = &Token{}
-		}
-		selStart := tok.Start
-		selEnd := tok.End
-		if selEnd < selStart {
-			selEnd = selStart + 1
-		}
-		l1 := getLine(selStart)
-		l2 := getLine(selEnd-1)
-		r := l2 - l1 + 1
-		l0 := 0
-		if len(lines) <= boxh {
-			l0 = 0
-		} else if r >= boxh {
-			l0 = l1
-		} else {
-			l0 = l1 - (boxh-r)/2
-			max0 := len(lines) - boxh
-			if max0 < 0 {
-				max0 = 0
-			}
-			l0 = clamp(l0, 0, max0)
-		}
-
-		for i := 0; i < boxh; i++ {
-			l := l0 + i
-			if l < len(sourceLines) {
-				s.PutStr(0, i, fmt.Sprintf("%d", l+1))
-				s.PutStr(3, i, "| ")
-				drawHighlightedLine(s, 5, i, sourceLines[l], selStart, selEnd, defStyle, textStyle)
 			}
 		}
 
@@ -254,12 +186,9 @@ func DebugScreen(ast *Token) {
 
 	drawAll()
 	for {
-		s.Show()
-
 		ev := <-s.EventQ()
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
-			// scrw, scrh = w.Size()
 			drawAll()
 		case *tcell.EventKey:
 			switch ev.Key() {

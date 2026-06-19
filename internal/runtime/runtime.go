@@ -2,12 +2,16 @@ package runtime
 
 import (
 	"errors"
-	"fmt"
 	"path/filepath"
-
+	"io"
+   "os"
+   "fmt"
+   "sync"
 	xxisParser "github.com/Greccl/xxis/internal/parser"
 	xxisToken "github.com/Greccl/xxis/internal/token"
 )
+
+type Token = xxisToken.Token
 
 func normalizePath(path string) (string, error) {
 	if path == "" {
@@ -21,91 +25,129 @@ func normalizePath(path string) (string, error) {
 	return filepath.Clean(abs), nil
 }
 
-type Value interface {
-	Expand() string
-	Get(string) string
-	Set(string, string)
+//
+// Functions
+//
+
+type Function struct {
+   Name string
+   Body []*Token
 }
 
-type StringValue string
-
-func (v StringValue) Expand() string {
-	return string(v)
-}
-
-func (v StringValue) Get(string) string {
-	return ""
-}
-
-func (v StringValue) Set(string, string) {
-}
-
-type ModuleValue struct {
-	Module *Module
-}
-
-func (v ModuleValue) Expand() string {
-	if v.Module == nil {
-		return ""
-	}
-	return v.Module.Path
-}
-
-func (v ModuleValue) Get(name string) string {
-	if v.Module == nil {
-		return ""
-	}
-	if item, ok := v.Module.Vars[name]; ok {
-		return item.Expand()
-	}
-	return ""
-}
-
-func (v ModuleValue) Set(name, value string) {
-	if v.Module == nil {
-		return
-	}
-	v.Module.Vars[name] = StringValue(value)
-}
+//
+// Modules
+//
 
 type Module struct {
-	Path  string
-	Ast   *xxisToken.Token
-	Vars  map[string]Value
-	Funcs map[string]*xxisToken.Token
+	Path   string
+	Funcs  map[string]*Token
+	Init   *Token
+	Locals map[string]Value
+	Shared map[string]SyncValue
 }
 
-var modules = make(map[string]*Module)
-
-func New_Module() *Module {
+func NewModule() *Module {
 	return &Module{
-		Vars:  make(map[string]Value),
-		Funcs: make(map[string]*xxisToken.Token),
+		Funcs:  make(map[string]*Token),
+		Shared: make(map[string]SyncValue),
+		Locals: make(map[string]Value),
 	}
 }
 
-func GetOrImport(path string) (*Module, error) {
+func (mod *Module) Load(tok *Token) {
+   mod.Init = tok.Toks[0].Toks[1]
+   for _, t := range tok.Toks[1:] {
+      name := string(t.Buf)
+      mod.Funcs[name] = t.Toks[1]
+   }
+}
+
+//
+// ThreadContext
+//
+
+type Frame struct {
+   Module *Module
+   Locals map[string]Value
+   Stdin  io.Reader
+   Stdout io.Writer
+   Stderr io.Writer
+}
+
+type ThreadContext struct {
+   Stack   []*Frame
+   Current *Frame
+}
+
+func NewThreadContext() *ThreadContext {
+   ctx := &ThreadContext{}
+   ctx.Stack = make([]*Frame, 0)
+   return ctx
+}
+
+func (ctx *ThreadContext) PushFrame(mod *Module) *Frame {
+   frame := &Frame{}
+   frame.Locals = make(map[string]Value)
+   frame.Module = mod
+   ctx.Stack = append(ctx.Stack, frame)
+   ctx.Current = frame
+   return frame
+}
+
+func (ctx *ThreadContext) ExpandVar(name string) string {
+   return fmt.Sprintf("<%s>", name)
+}
+
+//
+// GlobalContext
+//
+
+type GlobalContext struct {
+   Globals map[string]SyncValue
+   Modules map[string]*Module
+   mu sync.Mutex
+}
+
+var globalContext = &GlobalContext{
+	Globals: make(map[string]SyncValue),
+	Modules: make(map[string]*Module),
+}
+
+func DefaultGlobalContext() *GlobalContext {
+	return globalContext
+}
+
+func (global *GlobalContext) GetOrImport(path string) (*Module, error) {
 	normalized, err := normalizePath(path)
 	if err != nil {
 		return nil, err
 	}
-	if mod, ok := modules[normalized]; ok {
+
+	global.mu.Lock()
+	if mod, ok := global.Modules[normalized]; ok {
+		global.mu.Unlock()
 		return mod, nil
 	}
+	global.mu.Unlock()
 
 	ast := xxisParser.BuildAstFromPath(normalized)
-	mod := New_Module()
+	mod := NewModule()
 	mod.Path = normalized
-	mod.Ast = ast
-	modules[normalized] = mod
+	mod.Load(ast)
 
-	if err := Exec(ast, mod); err != nil {
+	global.mu.Lock()
+	global.Modules[normalized] = mod
+	global.mu.Unlock()
+
+	ctx := NewThreadContext()
+	ctx.PushFrame(mod)
+	if err := Exec(mod.Init, ctx); err != nil {
 		return nil, err
 	}
 	return mod, nil
 }
 
-func Source(parent *Module, path string) error {
+func (global *GlobalContext) Source(parent *Module, path string) error {
 	if parent == nil {
 		return errors.New("source requires a parent module")
 	}
@@ -115,92 +157,12 @@ func Source(parent *Module, path string) error {
 	}
 
 	ast := xxisParser.BuildAstFromPath(normalized)
-	return Exec(ast, parent)
+	return Exec(ast, NewThreadContext())
 }
 
-func Exec(tok *xxisToken.Token, mod *Module) error {
-	if tok == nil {
-		return nil
-	}
-	if mod == nil {
-		return errors.New("exec requires a module")
-	}
-	if mod.Vars == nil {
-		mod.Vars = make(map[string]Value)
-	}
-	if mod.Funcs == nil {
-		mod.Funcs = make(map[string]*xxisToken.Token)
-	}
-
-	switch tok.Typ {
-	case 'P':
-		return execProgram(tok, mod)
-	case 'F':
-		return execFunction(tok, mod)
-	case 'B':
-		for _, child := range tok.Toks {
-			if err := Exec(child, mod); err != nil {
-				return err
-			}
-		}
-	case 'K':
-		return execKeyword(tok, mod)
-	case 'C', '&', '/':
-		return nil
-	}
-	return nil
-}
-
-func execProgram(tok *xxisToken.Token, mod *Module) error {
-	for i, child := range tok.Toks {
-		if i == 0 {
-			continue
-		}
-		name := functionName(child)
-		if name != "" {
-			mod.Funcs[name] = child
-		}
-	}
-	if len(tok.Toks) == 0 {
-		return nil
-	}
-	return Exec(tok.Toks[0], mod)
-}
-
-func execFunction(tok *xxisToken.Token, mod *Module) error {
-	if len(tok.Toks) < 2 {
-		return nil
-	}
-	return Exec(tok.Toks[1], mod)
-}
-
-func execKeyword(tok *xxisToken.Token, mod *Module) error {
-	if len(tok.Buf) == 0 {
-		return nil
-	}
-
-	switch tok.Buf[0] {
-	case xxisToken.IMPORT:
-		if len(tok.Toks) != 2 {
-			return fmt.Errorf("invalid import token")
-		}
-		imported, err := GetOrImport(tokenText(tok.Toks[0]))
-		if err != nil {
-			return err
-		}
-		mod.Vars[tokenText(tok.Toks[1])] = ModuleValue{Module: imported}
-	case xxisToken.SOURCE:
-		if len(tok.Toks) != 1 {
-			return fmt.Errorf("invalid source token")
-		}
-		return Source(mod, tokenText(tok.Toks[0]))
-	case xxisToken.IF:
-		return nil
-	case xxisToken.VAR:
-		return nil
-	}
-	return nil
-}
+//
+// Extra
+//
 
 func functionName(tok *xxisToken.Token) string {
 	if tok == nil || tok.Typ != 'F' || len(tok.Toks) == 0 {
@@ -231,4 +193,23 @@ func tokenText(tok *xxisToken.Token) string {
 		out = append(out, []rune(tokenText(child))...)
 	}
 	return string(out)
+}
+
+//
+// Main
+//
+
+func Main(path string) error {
+   defer func() {
+      if err := recover(); err != nil {
+         fmt.Println("! RUNTIME ERROR ! ", err)
+         os.Exit(1)
+      }
+   }()
+   _, err := globalContext.GetOrImport(path)
+   if err != nil {
+      fmt.Println("! MAIN ERROR ! ", err)
+      os.Exit(1)
+   }
+   return nil
 }

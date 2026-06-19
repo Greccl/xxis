@@ -17,12 +17,13 @@ type ErrorWithRange struct {
    End int
 }
 
-func SetErrorPath(path string) {
+func HandlePanicForPath(path string) {
    if err := recover(); err != nil {
       switch x := err.(type) {
       case ErrorWithRange:
          x.Path = path
-         panic(x)
+         Print(x)
+         os.Exit(1)
       }
       panic(err)
    }
@@ -36,7 +37,7 @@ type SourceLine struct {
 
 func getLine(lines []SourceLine, offset int) int {
    for i, l := range lines {
-      if offset >= l.Start {
+      if offset <= l.End {
          return i
       }
    }
@@ -136,17 +137,5 @@ func Print(e ErrorWithRange) {
       } else {
          drawSourceLine(sourceLines[0], n, 0, -1)
       }
-   }
-}
-
-func Recover() {
-   if err := recover(); err != nil {
-      switch x := err.(type) {
-      case ErrorWithRange:
-         Print(x)
-      default:
-         panic(err)
-      }
-      os.Exit(1)
    }
 }

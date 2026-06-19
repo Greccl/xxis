@@ -1,0 +1,11 @@
+#!/bin/xxis
+
+import myModule path/to/my/module
+
+if true
+	exit
+
+function foo
+	echo hola mundo
+
+echo last statement

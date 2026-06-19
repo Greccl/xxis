@@ -542,30 +542,12 @@ func quoted_literal(tok *Token) (string, int, int, bool) {
 func parse_import(tok *Token) *Token {
 	scanner := new_keyword_arg_scanner(tok, 6)
 
-	path, pathStart, pathEnd, ok := scanner.nextPath()
-	if !ok || path == "" {
-		panic(ErrorWithRange{
-			Msg:   "import requires a path",
-			Start: pathStart,
-			End:   pathEnd,
-		})
-	}
-
-	word, wordStart, wordEnd, ok := scanner.nextWord()
-	if !ok || word != "as" {
-		panic(ErrorWithRange{
-			Msg:   "import requires 'as'",
-			Start: wordStart,
-			End:   wordEnd,
-		})
-	}
-
 	name, nameStart, nameEnd, ok := scanner.nextWord()
 	if !ok {
 		panic(ErrorWithRange{
 			Msg:   "import requires a name",
-			Start: nameStart,
-			End:   nameEnd,
+			Start: tok.Start,
+			End:   tok.End,
 		})
 	}
 	if !is_var_name(name) {
@@ -573,6 +555,15 @@ func parse_import(tok *Token) *Token {
 			Msg:   "invalid import name",
 			Start: nameStart,
 			End:   nameEnd,
+		})
+	}
+
+	path, pathStart, pathEnd, ok := scanner.nextPath()
+	if !ok || path == "" {
+		panic(ErrorWithRange{
+			Msg:   "import requires a path",
+			Start: tok.Start,
+			End:   tok.End,
 		})
 	}
 
@@ -631,6 +622,8 @@ func parse_var_scope(word string) (rune, bool) {
 	switch word {
 	case "-l", "--local":
 		return xxisToken.VarScopeLocal, true
+	case "-s", "--shared":
+		return xxisToken.VarScopeShared, true
 	case "-g", "--global":
 		return xxisToken.VarScopeGlobal, true
 	case "-u", "--universal":
